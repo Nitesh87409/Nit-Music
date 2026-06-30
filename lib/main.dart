@@ -145,7 +145,12 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
       );
     }
 
-    // Update checking disabled for personal build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!isFdroidBuild && kReleaseMode && !offlineMode.value) {
+        checkAppUpdates();
+        isUpdateChecked = true;
+      }
+    });
   }
 
   @override
