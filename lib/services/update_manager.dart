@@ -198,8 +198,10 @@ void showUpdateCheckDialog(BuildContext context) {
 }
 
 bool isLatestVersionHigher(String appVersion, String latestVersion) {
-  final parsedAppVersion = appVersion.split('.');
-  final parsedAppLatestVersion = latestVersion.split('.');
+  final cleanAppVersion = appVersion.split('+').first;
+  final cleanLatestVersion = latestVersion.split('+').first;
+  final parsedAppVersion = cleanAppVersion.split('.');
+  final parsedAppLatestVersion = cleanLatestVersion.split('.');
   final length = parsedAppVersion.length > parsedAppLatestVersion.length
       ? parsedAppVersion.length
       : parsedAppLatestVersion.length;

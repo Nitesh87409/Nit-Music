@@ -1,8 +1,8 @@
-name: musify
+name: Nit_Music
 description: Music Streaming app made in Flutter!
 
 publish_to: 'none'
-version: 10.1.4+179 # run update.sh after changing the version
+version: 10.1.5+180 # run update.sh after changing the version
 
 environment:
   sdk: '>=3.12.0 <4.0.0'
