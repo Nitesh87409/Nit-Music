@@ -104,9 +104,10 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                                   child: widget.child,
                                 ),
                                 const Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 8,
+                                  padding: EdgeInsets.only(
+                                    left: 16,
+                                    right: 16,
+                                    bottom: 16,
                                   ),
                                   child: MiniPlayer(),
                                 ),
@@ -120,6 +121,9 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                 ),
                 bottomNavigationBar: !isLargeScreen
                     ? NavigationBar(
+                        backgroundColor: const Color(0xFF09090E),
+                        indicatorColor: Colors.transparent,
+                        elevation: 0,
                         selectedIndex: _getCurrentIndex(items, isOfflineMode),
                         labelBehavior: languageSetting == const Locale('en', '')
                             ? NavigationDestinationLabelBehavior

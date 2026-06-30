@@ -47,10 +47,10 @@ class NowPlayingArtwork extends StatelessWidget {
           borderRadius: BorderRadius.circular(borderRadius),
           boxShadow: [
             BoxShadow(
-              color: colorScheme.shadow.withValues(alpha: 0.15),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-              spreadRadius: 2,
+              color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+              blurRadius: 40,
+              offset: const Offset(0, 4),
+              spreadRadius: 4,
             ),
           ],
         ),
@@ -72,10 +72,10 @@ class NowPlayingArtwork extends StatelessWidget {
           borderRadius: BorderRadius.circular(borderRadius),
           boxShadow: [
             BoxShadow(
-              color: colorScheme.shadow.withValues(alpha: 0.15),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-              spreadRadius: 2,
+              color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+              blurRadius: 40,
+              offset: const Offset(0, 4),
+              spreadRadius: 4,
             ),
           ],
         ),

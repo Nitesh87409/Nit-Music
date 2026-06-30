@@ -165,10 +165,11 @@ class _BottomActionsRowState extends State<BottomActionsRow> {
         ];
 
         return Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(20),
+            color: const Color(0xFF1E1E2A),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white10, width: 1),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -193,25 +194,38 @@ class _BottomActionsRowState extends State<BottomActionsRow> {
     return ValueListenableBuilder<bool>(
       valueListenable: statusNotifier,
       builder: (_, isActive, __) {
-        return IconButton(
-          icon: Icon(
-            isActive ? activeIcon : icon,
-            color: isActive
-                ? (activeColor ?? colorScheme.primary)
-                : colorScheme.onSurfaceVariant,
-          ),
-          iconSize: size,
-          tooltip: tooltip,
-          style: IconButton.styleFrom(
-            backgroundColor: isActive
-                ? (activeColor ?? colorScheme.primary).withValues(alpha: 0.15)
-                : Colors.transparent,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(
+                isActive ? activeIcon : icon,
+                color: isActive
+                    ? const Color(0xFF8B5CF6)
+                    : colorScheme.onSurfaceVariant,
+              ),
+              iconSize: size,
+              tooltip: tooltip,
+              style: IconButton.styleFrom(
+                backgroundColor: isActive
+                    ? const Color(0xFF8B5CF6).withOpacity(0.15)
+                    : Colors.transparent,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: onPressed,
             ),
-          ),
-          onPressed: onPressed,
+            if (tooltip != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                tooltip,
+                style: const TextStyle(fontSize: 10, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ],
         );
       },
     );
@@ -225,15 +239,28 @@ class _BottomActionsRowState extends State<BottomActionsRow> {
     required VoidCallback onPressed,
     String? tooltip,
   }) {
-    return IconButton(
-      icon: Icon(icon, color: colorScheme.onSurfaceVariant),
-      iconSize: size,
-      tooltip: tooltip,
-      style: IconButton.styleFrom(
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      onPressed: onPressed,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: Icon(icon, color: colorScheme.onSurfaceVariant),
+          iconSize: size,
+          tooltip: tooltip,
+          style: IconButton.styleFrom(
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          onPressed: onPressed,
+        ),
+        if (tooltip != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            tooltip,
+            style: const TextStyle(fontSize: 10, color: Colors.grey),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ],
     );
   }
 
@@ -246,39 +273,50 @@ class _BottomActionsRowState extends State<BottomActionsRow> {
       valueListenable: sleepTimerNotifier,
       builder: (_, value, __) {
         final isActive = value != null;
-        return IconButton(
-          icon: Icon(
-            isActive
-                ? FluentIcons.timer_24_filled
-                : FluentIcons.timer_24_regular,
-            color: isActive
-                ? colorScheme.primary
-                : colorScheme.onSurfaceVariant,
-          ),
-          iconSize: size,
-          tooltip: context.l10n!.sleepTimer,
-          style: IconButton.styleFrom(
-            backgroundColor: isActive
-                ? colorScheme.primary.withValues(alpha: 0.15)
-                : Colors.transparent,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(
+                isActive
+                    ? FluentIcons.timer_24_filled
+                    : FluentIcons.timer_24_regular,
+                color: isActive
+                    ? const Color(0xFF8B5CF6)
+                    : colorScheme.onSurfaceVariant,
+              ),
+              iconSize: size,
+              tooltip: context.l10n!.sleepTimer,
+              style: IconButton.styleFrom(
+                backgroundColor: isActive
+                    ? const Color(0xFF8B5CF6).withOpacity(0.15)
+                    : Colors.transparent,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () {
+                if (isActive) {
+                  audioHandler.cancelSleepTimer();
+                  sleepTimerNotifier.value = null;
+                  showToast(
+                    context,
+                    context.l10n!.sleepTimerCancelled,
+                    duration: const Duration(seconds: 1, milliseconds: 500),
+                  );
+                } else {
+                  _showSleepTimerDialog(context);
+                }
+              },
             ),
-          ),
-          onPressed: () {
-            if (isActive) {
-              audioHandler.cancelSleepTimer();
-              sleepTimerNotifier.value = null;
-              showToast(
-                context,
-                context.l10n!.sleepTimerCancelled,
-                duration: const Duration(seconds: 1, milliseconds: 500),
-              );
-            } else {
-              _showSleepTimerDialog(context);
-            }
-          },
+            const SizedBox(height: 4),
+            Text(
+              context.l10n!.sleepTimer,
+              style: const TextStyle(fontSize: 10, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+          ],
         );
       },
     );

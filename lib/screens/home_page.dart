@@ -17,6 +17,7 @@ import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_cube.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/song_bar.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -56,63 +57,216 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final playlistHeight = MediaQuery.sizeOf(context).height * 0.25 / 1.1;
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar.large(
-            title: const Text('Nit Music'),
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Theme.of(
-                        context,
-                      ).colorScheme.primaryContainer.withValues(alpha: 0.4),
-                      Theme.of(context).scaffoldBackgroundColor,
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
+      backgroundColor: const Color(0xFF09090E),
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildTopBar(context),
+                    const SizedBox(height: 24),
+                    _buildSearchBar(context),
+                    const SizedBox(height: 24),
+                    _buildGreetingBanner(context),
+                    const SizedBox(height: 32),
+                    ValueListenableBuilder<String?>(
+                      valueListenable: announcementURL,
+                      builder: (_, _url, __) {
+                        if (_url == null) return const SizedBox.shrink();
+                        final isSponsorshipAnnouncement =
+                            isSponsorshipAnnouncementUrl(_url);
+                        final _message = isSponsorshipAnnouncement
+                            ? context.l10n!.sponsorProject
+                            : context.l10n!.newAnnouncement;
+                        final _icon = isSponsorshipAnnouncement
+                            ? FluentIcons.heart_24_filled
+                            : FluentIcons.megaphone_24_filled;
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 24.0),
+                          child: AnnouncementBox(
+                            message: _message,
+                            url: _url,
+                            icon: _icon,
+                            onDismiss: () async {
+                              announcementURL.value = null;
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                    _buildSuggestedPlaylists(playlistHeight),
+                    const SizedBox(height: 24),
+                    _buildRecommendedSongsSection(),
+                    const MiniPlayerBottomSpace(),
+                  ],
                 ),
               ),
             ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: commonSingleChildScrollViewPadding,
-              child: Column(
-                children: [
-                  ValueListenableBuilder<String?>(
-                    valueListenable: announcementURL,
-                    builder: (_, _url, __) {
-                      if (_url == null) return const SizedBox.shrink();
-                      final isSponsorshipAnnouncement =
-                          isSponsorshipAnnouncementUrl(_url);
-                      final _message = isSponsorshipAnnouncement
-                          ? context.l10n!.sponsorProject
-                          : context.l10n!.newAnnouncement;
-                      final _icon = isSponsorshipAnnouncement
-                          ? FluentIcons.heart_24_filled
-                          : FluentIcons.megaphone_24_filled;
+          ],
+        ),
+      ),
+    );
+  }
 
-                      return AnnouncementBox(
-                        message: _message,
-                        url: _url,
-                        icon: _icon,
-                        onDismiss: () async {
-                          announcementURL.value = null;
-                        },
-                      );
-                    },
+  Widget _buildTopBar(BuildContext context) {
+    return Row(
+      children: [
+        IconButton(
+          icon: const Icon(Icons.menu, color: Colors.white, size: 28),
+          padding: EdgeInsets.zero,
+          alignment: Alignment.centerLeft,
+          onPressed: () {
+            Scaffold.of(context).openDrawer();
+          },
+        ),
+        const SizedBox(width: 8),
+        Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(
+                text: 'Nit',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 28,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              WidgetSpan(
+                child: ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [Color(0xFFA67CFF), Color(0xFF5A75FF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ).createShader(bounds),
+                  child: const Text(
+                    'Music',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 28,
+                      letterSpacing: -0.5,
+                    ),
                   ),
-                  _buildSuggestedPlaylists(playlistHeight),
-                  _buildSuggestedPlaylists(playlistHeight, showOnlyLiked: true),
-                  _buildCurrentMonthRecapSection(),
-                  _buildRecommendedSongsSection(),
-                  const MiniPlayerBottomSpace(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchBar(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => context.push('/search'),
+            child: Container(
+              height: 52,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E2A),
+                borderRadius: BorderRadius.circular(26),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  const Icon(FluentIcons.search_24_regular, color: Colors.grey),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Search songs, artists, albums...',
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
                 ],
               ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Container(
+          width: 52,
+          height: 52,
+          decoration: const BoxDecoration(
+            color: Color(0xFF8B5CF6),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            FluentIcons.mic_24_filled, // Using mic icon as placeholder for waveform
+            color: Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGreetingBanner(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2C2442), Color(0xFF181534)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Good evening, Shivam 👋',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Let\'s play something amazing',
+                  style: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF8B5CF6),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Icon(
+              FluentIcons.play_24_filled,
+              color: Colors.white,
+              size: 24,
             ),
           ),
         ],
@@ -120,24 +274,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildSuggestedPlaylists(
-    double playlistHeight, {
-    bool showOnlyLiked = false,
-  }) {
-    if (showOnlyLiked) {
-      return ValueListenableBuilder<List<Map>>(
-        valueListenable: userLikedPlaylists,
-        builder: (_, likedPlaylists, __) => _buildSuggestedPlaylistsSection(
-          playlistHeight,
-          likedPlaylists
-              .where((playlist) => !isArtistPlaylist(playlist))
-              .take(recommendedCubesNumber)
-              .toList(),
-          showOnlyLiked: true,
-        ),
-      );
-    }
-
+  Widget _buildSuggestedPlaylists(double playlistHeight) {
     return AsyncLoader<List<dynamic>>(
       future: _suggestedPlaylistsFuture,
       builder: (context, playlists) =>
@@ -147,69 +284,127 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildSuggestedPlaylistsSection(
     double playlistHeight,
-    List<dynamic> playlists, {
-    bool showOnlyLiked = false,
-  }) {
+    List<dynamic> playlists,
+  ) {
     if (playlists.isEmpty) return const SizedBox.shrink();
-
-    final sectionTitle = showOnlyLiked
-        ? context.l10n!.backToFavorites
-        : context.l10n!.suggestedPlaylists;
     final itemsNumber = playlists.length.clamp(0, recommendedCubesNumber);
-    final isLargeScreen = MediaQuery.of(context).size.width > 480;
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(
-          title: sectionTitle,
-          icon: showOnlyLiked
-              ? FluentIcons.heart_24_filled
-              : FluentIcons.list_24_filled,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Your top mixes',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            TextButton(
+              onPressed: () {},
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'See all',
+                style: TextStyle(
+                  color: Color(0xFFA67CFF),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ),
-        ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: playlistHeight),
-          child: isLargeScreen
-              ? _buildHorizontalList(playlists, itemsNumber, playlistHeight)
-              : _buildCarouselView(playlists, itemsNumber, playlistHeight),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 190,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: itemsNumber,
+            itemBuilder: (context, index) {
+              final playlist = playlists[index];
+              return Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: GestureDetector(
+                  onTap: () =>
+                      context.push('/home/playlist/${playlist['ytid']}'),
+                  child: _buildMixCard(playlist),
+                ),
+              );
+            },
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildHorizontalList(
-    List<dynamic> playlists,
-    int itemCount,
-    double height,
-  ) {
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      itemCount: itemCount,
-      itemBuilder: (context, index) {
-        final playlist = playlists[index];
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: GestureDetector(
-            onTap: () => context.push('/home/playlist/${playlist['ytid']}'),
-            child: PlaylistCube(playlist, size: height),
+  Widget _buildMixCard(dynamic playlist) {
+    final imageUrl = playlist['image'].toString();
+    final title = playlist['title'].toString();
+    
+    return SizedBox(
+      width: 140,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 140,
+            height: 140,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: const Color(0xFF1E1E2A),
+              image: DecorationImage(
+                image: CachedNetworkImageProvider(imageUrl),
+                fit: BoxFit.cover,
+              ),
+            ),
+            child: Align(
+              alignment: Alignment.bottomRight,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Colors.black87,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    FluentIcons.play_16_filled,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ),
+            ),
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCarouselView(
-    List<dynamic> playlists,
-    int itemCount,
-    double height,
-  ) {
-    return CarouselView.weighted(
-      flexWeights: const <int>[3, 2, 1],
-      itemSnapping: true,
-      onTap: (index) =>
-          context.push('/home/playlist/${playlists[index]['ytid']}'),
-      children: List.generate(itemCount, (index) {
-        return PlaylistCube(playlists[index], size: height * 2);
-      }),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Mix',
+            style: TextStyle(
+              color: Colors.grey.shade400,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -223,105 +418,124 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildCurrentMonthRecapSection() {
-    return ValueListenableBuilder<bool>(
-      valueListenable: wrappedEnabled,
-      builder: (_, isEnabled, __) {
-        if (!isEnabled) return const SizedBox.shrink();
-
-        final currentMonthKey = listeningStatsMonthKey(DateTime.now());
-        final monthStats = listeningStatsService.monthStats(currentMonthKey);
-        final songs = listeningStatsService.monthTopSongs(currentMonthKey);
-        final displayMinutes = monthDisplayMinutes(monthStats);
-        if (displayMinutes <= 0 && songs.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        final previewSongs = songs.take(wrappedShareSongsLimit).toList();
-        final periodLabel = formatMonthPeriodLabel(
-          Localizations.localeOf(context),
-          currentMonthKey,
-        );
-
-        return Column(
-          children: [
-            SectionHeader(
-              title: context.l10n!.timeMachine,
-              icon: FluentIcons.data_trending_24_filled,
-            ),
-            ListeningRecapCard(
-              periodLabel: periodLabel,
-              minutes: displayMinutes,
-              songs: previewSongs,
-              onSongTap: (index) => _playRecapSongs(previewSongs, index),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 10, 8, 0),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton.tonalIcon(
-                  onPressed: () => context.push('/home/timeMachine'),
-                  icon: const Icon(FluentIcons.arrow_right_24_regular),
-                  label: Text(context.l10n!.listeningStats),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _playRecapSongs(
-    List<Map<String, dynamic>> songs,
-    int index,
-  ) async {
-    if (songs.isEmpty) return;
-    await audioHandler.playPlaylistSong(
-      playlist: {'title': context.l10n!.timeMachine, 'list': songs},
-      songIndex: index,
-    );
-  }
-
   Widget _buildRecommendedForYouSection(
     BuildContext context,
     List<dynamic> data,
   ) {
-    final recommendedTitle = context.l10n!.recommendedForYou;
-
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(
-          title: recommendedTitle,
-          icon: FluentIcons.sparkle_24_filled,
-          actionButton: IconButton(
-            onPressed: () async {
-              await audioHandler.playPlaylistSong(
-                playlist: {'title': recommendedTitle, 'list': data},
-                songIndex: 0,
-              );
-            },
-            icon: Icon(
-              FluentIcons.play_circle_24_filled,
-              color: Theme.of(context).colorScheme.primary,
-              size: 30,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Recommended for you',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
+            TextButton(
+              onPressed: () {},
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'See all',
+                style: TextStyle(
+                  color: Color(0xFFA67CFF),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ),
+        const SizedBox(height: 16),
         ListView.builder(
           shrinkWrap: true,
-          physics: const BouncingScrollPhysics(),
+          physics: const NeverScrollableScrollPhysics(),
           itemCount: data.length,
-          padding: commonListViewBottomPadding,
+          padding: EdgeInsets.zero,
           itemBuilder: (context, index) {
-            final borderRadius = getItemBorderRadius(index, data.length);
-            return RepaintBoundary(
-              key: listItemKey('home_recommended', index, data[index]),
-              child: SongBar(data[index], true, borderRadius: borderRadius),
-            );
+            return _buildRecommendedSongTile(data[index], index, data);
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildRecommendedSongTile(dynamic song, int index, List<dynamic> data) {
+    final title = song['title'].toString();
+    final artist = song['artist']?.toString() ?? 'Unknown Artist';
+    final imageUrl = song['image']?.toString() ?? '';
+
+    return InkWell(
+      onTap: () async {
+        await audioHandler.playPlaylistSong(
+          playlist: {'title': 'Recommended for you', 'list': data},
+          songIndex: index,
+        );
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 16.0),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFF1E1E2A),
+                image: DecorationImage(
+                  image: CachedNetworkImageProvider(imageUrl),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.grey.shade400,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(FluentIcons.heart_24_regular, color: Color(0xFFA67CFF)),
+              onPressed: () {},
+            ),
+            IconButton(
+              icon: const Icon(FluentIcons.more_vertical_24_regular, color: Colors.grey),
+              onPressed: () {},
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

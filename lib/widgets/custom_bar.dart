@@ -29,7 +29,7 @@ class CustomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final effectiveIconColor = iconColor ?? colorScheme.onSecondaryContainer;
+    final effectiveIconColor = iconColor ?? const Color(0xFF8B5CF6);
 
     return Material(
       color: backgroundColor ?? colorScheme.surfaceContainerLow,
@@ -46,7 +46,7 @@ class CustomBar extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: colorScheme.secondaryContainer,
+                  color: const Color(0xFF8B5CF6).withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(tileIcon, size: 26, color: effectiveIconColor),

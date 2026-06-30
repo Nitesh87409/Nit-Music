@@ -69,31 +69,28 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
   final isPureBlack =
       colorScheme.brightness == Brightness.dark && usePureBlackColor.value;
 
-  // Pure black theme colors
-  const pureBlack = Color(0xFF000000);
-  const pureBlackElevated = Color(0xFF0A0A0A);
-  const pureBlackContainer = Color(0xFF121212);
-  const pureBlackContainerHigh = Color(0xFF1A1A1A);
+  // Pure black / Dark Purple theme colors
+  const bgColorValue = Color(0xFF09090E);
+  const cardColorValue = Color(0xFF1E1E2A);
+  const containerHighValue = Color(0xFF2A2A35);
+  const primaryColorValue = Color(0xFF8B5CF6);
 
-  final bgColor = isLight
-      ? colorScheme.surface
-      : (isPureBlack ? pureBlack : null);
-
-  final cardBgColor = isLight
-      ? colorScheme.surfaceContainerLow
-      : (isPureBlack ? pureBlackElevated : null);
+  final bgColor = bgColorValue;
+  final cardBgColor = cardColorValue;
 
   // modified color scheme for pure black theme
-  final effectiveColorScheme = isPureBlack
-      ? colorScheme.copyWith(
-          surface: pureBlack,
-          surfaceContainerLowest: pureBlack,
-          surfaceContainerLow: pureBlackElevated,
-          surfaceContainer: pureBlackContainer,
-          surfaceContainerHigh: pureBlackContainerHigh,
-          surfaceContainerHighest: pureBlackContainerHigh,
-        )
-      : colorScheme;
+  final effectiveColorScheme = ColorScheme.dark(
+    primary: primaryColorValue,
+    onPrimary: Colors.white,
+    secondary: const Color(0xFF00E5FF),
+    onSecondary: Colors.black,
+    surface: bgColorValue,
+    surfaceContainerLowest: bgColorValue,
+    surfaceContainerLow: cardColorValue,
+    surfaceContainer: cardColorValue,
+    surfaceContainerHigh: containerHighValue,
+    surfaceContainerHighest: containerHighValue,
+  );
 
   return ThemeData(
     scaffoldBackgroundColor: bgColor,
@@ -132,23 +129,20 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       iconColor: effectiveColorScheme.primary,
     ),
     sliderTheme: base.sliderTheme.copyWith(
-      year2023: false,
-      trackHeight: 12,
-      thumbSize: WidgetStateProperty.all(const Size(6, 30)),
+      trackHeight: 4,
+      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+      overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+      activeTrackColor: primaryColorValue,
+      inactiveTrackColor: primaryColorValue.withOpacity(0.2),
+      thumbColor: Colors.white,
     ),
     bottomSheetTheme: base.bottomSheetTheme.copyWith(
-      backgroundColor: isLight
-          ? colorScheme.surfaceContainerLow
-          : (isPureBlack ? pureBlackElevated : null),
+      backgroundColor: cardColorValue,
     ),
     inputDecorationTheme: base.inputDecorationTheme.copyWith(
       filled: true,
       isDense: true,
-      fillColor: isLight
-          ? colorScheme.surfaceContainerHighest
-          : (isPureBlack
-                ? pureBlackContainerHigh
-                : colorScheme.surfaceContainerHigh),
+      fillColor: containerHighValue,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -156,9 +150,7 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       contentPadding: const EdgeInsets.fromLTRB(18, 14, 20, 14),
     ),
     dialogTheme: base.dialogTheme.copyWith(
-      backgroundColor: isLight
-          ? colorScheme.surfaceContainerLow
-          : (isPureBlack ? pureBlackContainer : null),
+      backgroundColor: cardColorValue,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
     ),
     navigationBarTheme: base.navigationBarTheme.copyWith(
@@ -217,9 +209,7 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       ),
     ),
     popupMenuTheme: base.popupMenuTheme.copyWith(
-      color: isLight
-          ? colorScheme.surfaceContainerLow
-          : (isPureBlack ? pureBlackContainer : null),
+      color: cardColorValue,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
     dividerTheme: base.dividerTheme.copyWith(

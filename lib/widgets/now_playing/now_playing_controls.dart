@@ -9,6 +9,8 @@ import 'package:musify/main.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
+import 'package:musify/services/common_services.dart';
+import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/widgets/now_playing/marquee_text_widget.dart';
 import 'package:musify/widgets/playback_icon_button.dart';
 import 'package:musify/widgets/position_slider.dart';
@@ -66,33 +68,44 @@ class NowPlayingControls extends StatelessWidget {
                 horizontal: isDesktop ? 16 : 24,
                 vertical: spacing,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+              child: Row(
                 children: [
-                  MarqueeTextWidget(
-                    text: metadata.title,
-                    fontColor: colorScheme.secondary,
-                    fontSize: titleFontSize * fontScale,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  SizedBox(height: spacing),
-                  if (metadata.artist != null)
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: canOpenArtist
-                          ? () => _openArtistPage(context, metadata)
-                          : null,
-                      child: MarqueeTextWidget(
-                        text: metadata.artist!,
-                        fontColor: colorScheme.onSurfaceVariant,
-                        fontSize: artistFontSize * fontScale,
-                        fontWeight: FontWeight.w500,
-                      ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        MarqueeTextWidget(
+                          text: metadata.title,
+                          fontColor: Colors.white,
+                          fontSize: titleFontSize * fontScale,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        SizedBox(height: spacing),
+                        if (metadata.artist != null)
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: canOpenArtist
+                                ? () => _openArtistPage(context, metadata)
+                                : null,
+                            child: MarqueeTextWidget(
+                              text: metadata.artist!,
+                              fontColor: const Color(0xFF8B5CF6),
+                              fontSize: artistFontSize * fontScale,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                      ],
                     ),
+                  ),
+                  const SizedBox(width: 16),
+                  _LikeButton(audioId: audioId, metadata: metadata),
                 ],
               ),
             ),
             if (!isCompact) const Spacer(),
+            if (!isCompact) const _StaticWaveform(),
+            if (!isCompact) const SizedBox(height: 16),
             ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: isDesktop ? 400 : constraints.maxWidth,
@@ -290,10 +303,8 @@ class PlayerControlButtons extends StatelessWidget {
                                       ? () => audioHandler.skipToPrevious()
                                       : null,
                                   style: IconButton.styleFrom(
-                                    backgroundColor:
-                                        colorScheme.surfaceContainerHighest,
-                                    disabledBackgroundColor:
-                                        colorScheme.surfaceContainerHighest,
+                                    backgroundColor: const Color(0xFF1E1E2A),
+                                    disabledBackgroundColor: const Color(0xFF1E1E2A),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
                                     ),
@@ -307,7 +318,7 @@ class PlayerControlButtons extends StatelessWidget {
                                 SizedBox(width: buttonSpacing),
                                 PlaybackIconButton(
                                   iconColor: colorScheme.onPrimary,
-                                  backgroundColor: colorScheme.primary,
+                                  backgroundColor: const Color(0xFF8B5CF6),
                                   iconSize: controlIconSize,
                                   padding: playPadding,
                                 ),
@@ -330,10 +341,8 @@ class PlayerControlButtons extends StatelessWidget {
                                       ? audioHandler.playAgain()
                                       : audioHandler.skipToNext(),
                                   style: IconButton.styleFrom(
-                                    backgroundColor:
-                                        colorScheme.surfaceContainerHighest,
-                                    disabledBackgroundColor:
-                                        colorScheme.surfaceContainerHighest,
+                                    backgroundColor: const Color(0xFF1E1E2A),
+                                    disabledBackgroundColor: const Color(0xFF1E1E2A),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
                                     ),
@@ -391,8 +400,8 @@ class PlayerControlButtons extends StatelessWidget {
           padding: buttonPadding,
           style: IconButton.styleFrom(
             backgroundColor: value
-                ? colorScheme.primary
-                : colorScheme.surfaceContainerHighest,
+                ? const Color(0xFF8B5CF6)
+                : const Color(0xFF1E1E2A),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -442,8 +451,8 @@ class PlayerControlButtons extends StatelessWidget {
               padding: buttonPadding,
               style: IconButton.styleFrom(
                 backgroundColor: isActive
-                    ? colorScheme.primary
-                    : colorScheme.surfaceContainerHighest,
+                    ? const Color(0xFF8B5CF6)
+                    : const Color(0xFF1E1E2A),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -463,6 +472,95 @@ class PlayerControlButtons extends StatelessWidget {
                 audioHandler.setRepeatMode(newMode);
               },
             );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _StaticWaveform extends StatelessWidget {
+  const _StaticWaveform();
+
+  @override
+  Widget build(BuildContext context) {
+    final heights = [5.0, 10.0, 15.0, 25.0, 15.0, 20.0, 35.0, 25.0, 45.0, 30.0, 20.0, 10.0, 15.0, 25.0, 35.0, 25.0, 15.0, 30.0, 20.0, 15.0, 10.0, 5.0];
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: heights.map((h) {
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          width: 3,
+          height: h,
+          decoration: BoxDecoration(
+            color: const Color(0xFF8B5CF6).withOpacity(0.6),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _LikeButton extends StatefulWidget {
+  const _LikeButton({required this.audioId, required this.metadata});
+  final dynamic audioId;
+  final MediaItem metadata;
+
+  @override
+  State<_LikeButton> createState() => _LikeButtonState();
+}
+
+class _LikeButtonState extends State<_LikeButton> {
+  late final ValueNotifier<bool> _songLikeStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _songLikeStatus = ValueNotifier<bool>(isSongAlreadyLiked(widget.audioId));
+    userLikedSongsList.addListener(_syncLikeStatus);
+  }
+
+  void _syncLikeStatus() {
+    final newStatus = isSongAlreadyLiked(widget.audioId);
+    if (_songLikeStatus.value != newStatus) {
+      _songLikeStatus.value = newStatus;
+    }
+  }
+
+  @override
+  void didUpdateWidget(_LikeButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.audioId != widget.audioId) {
+      _songLikeStatus.value = isSongAlreadyLiked(widget.audioId);
+    }
+  }
+
+  @override
+  void dispose() {
+    userLikedSongsList.removeListener(_syncLikeStatus);
+    _songLikeStatus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: _songLikeStatus,
+      builder: (_, isActive, __) {
+        return IconButton(
+          icon: Icon(
+            isActive ? FluentIcons.heart_24_filled : FluentIcons.heart_24_regular,
+            color: isActive ? const Color(0xFF8B5CF6) : Colors.white70,
+          ),
+          iconSize: 28,
+          onPressed: () {
+            updateSongLikeStatus(
+              widget.audioId,
+              !_songLikeStatus.value,
+              songData: mediaItemToMap(widget.metadata),
+            );
+            _songLikeStatus.value = !_songLikeStatus.value;
           },
         );
       },

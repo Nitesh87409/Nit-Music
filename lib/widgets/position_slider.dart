@@ -65,7 +65,7 @@ class _PositionSliderState extends State<PositionSlider> {
     );
   }
 
-  static const _textStyle = TextStyle(fontSize: 15);
+  static const _textStyle = TextStyle(fontSize: 12, color: Colors.grey);
 
   Widget _buildPositionRow(BuildContext context, PositionData positionData) {
     final positionText = formatDuration(

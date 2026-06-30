@@ -30,7 +30,7 @@ class MiniPlayer extends StatelessWidget {
   const MiniPlayer({super.key});
 
   static const double playerHeight = 72;
-  static const double _borderRadius = 20;
+  static const double _borderRadius = 36;
   static const double _artworkSize = 52;
   static const double _artworkRadius = 14;
 
@@ -58,10 +58,13 @@ class MiniPlayer extends StatelessWidget {
                   (state.playbackState.queueIndex ?? 0) <
                       state.queue.length - 1;
 
+                final hasPrevious = (state.playbackState.queueIndex ?? 0) > 0;
+
               return _MiniPlayerBody(
                 colorScheme: colorScheme,
                 metadata: metadata,
                 state: state,
+                hasPrevious: hasPrevious,
                 hasNext: hasNext,
               );
             },
@@ -77,12 +80,14 @@ class _MiniPlayerBody extends StatefulWidget {
     required this.colorScheme,
     required this.metadata,
     required this.state,
+    required this.hasPrevious,
     required this.hasNext,
   });
 
   final ColorScheme colorScheme;
   final MediaItem metadata;
   final FullPlayerState state;
+  final bool hasPrevious;
   final bool hasNext;
 
   @override
@@ -171,21 +176,22 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
                 child: Container(
                   height: MiniPlayer.playerHeight,
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHigh.withValues(
-                      alpha: 0.65,
+                    color: const Color(0xFF181534).withValues(
+                      alpha: 0.95,
                     ),
                     borderRadius: BorderRadius.circular(
                       MiniPlayer._borderRadius,
                     ),
                     border: Border.all(
-                      color: colorScheme.onSurface.withValues(alpha: 0.1),
+                      color: const Color(0xFFA67CFF).withValues(alpha: 0.3),
                       width: 1,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: colorScheme.shadow.withValues(alpha: 0.2),
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
                         blurRadius: 16,
-                        offset: const Offset(0, 4),
+                        spreadRadius: 1,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
@@ -225,6 +231,7 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
                         _ControlsWidget(
                           colorScheme: colorScheme,
                           playbackState: state.playbackState,
+                          hasPrevious: widget.hasPrevious,
                           hasNext: widget.hasNext,
                           progress: progress,
                         ),
@@ -333,12 +340,14 @@ class _ControlsWidget extends StatelessWidget {
   const _ControlsWidget({
     required this.colorScheme,
     required this.playbackState,
+    required this.hasPrevious,
     required this.hasNext,
     required this.progress,
   });
 
   final ColorScheme colorScheme;
   final PlaybackState playbackState;
+  final bool hasPrevious;
   final bool hasNext;
   final double progress;
 
@@ -347,6 +356,20 @@ class _ControlsWidget extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (hasPrevious) ...[
+          IconButton(
+            onPressed: audioHandler.skipToPrevious,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            icon: const Icon(
+              FluentIcons.previous_24_filled,
+              color: Colors.white,
+              size: 20,
+            ),
+            visualDensity: VisualDensity.compact,
+          ),
+          const SizedBox(width: 4),
+        ],
         _CircularPlayButton(
           colorScheme: colorScheme,
           playbackState: playbackState,
@@ -358,10 +381,10 @@ class _ControlsWidget extends StatelessWidget {
             onPressed: audioHandler.skipToNext,
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,
-            icon: Icon(
+            icon: const Icon(
               FluentIcons.next_24_filled,
-              color: colorScheme.onSurfaceVariant,
-              size: 24,
+              color: Colors.white,
+              size: 20,
             ),
             visualDensity: VisualDensity.compact,
           ),
@@ -416,22 +439,31 @@ class _CircularPlayButton extends StatelessWidget {
               ),
             )
           else
-            IconButton(
-              onPressed: isCompleted
-                  ? () => audioHandler.playAgain()
-                  : (isPlaying ? audioHandler.pause : audioHandler.play),
-              splashColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-              icon: Icon(
-                isCompleted
-                    ? FluentIcons.arrow_counterclockwise_24_filled
-                    : (isPlaying
-                          ? FluentIcons.pause_16_filled
-                          : FluentIcons.play_16_filled),
-                color: colorScheme.primary,
-                size: 22,
+            Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                color: Color(0xFF8B5CF6),
+                shape: BoxShape.circle,
               ),
-              visualDensity: VisualDensity.compact,
+              child: IconButton(
+                onPressed: isCompleted
+                    ? () => audioHandler.playAgain()
+                    : (isPlaying ? audioHandler.pause : audioHandler.play),
+                splashColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                icon: Icon(
+                  isCompleted
+                      ? FluentIcons.arrow_counterclockwise_24_filled
+                      : (isPlaying
+                            ? FluentIcons.pause_16_filled
+                            : FluentIcons.play_16_filled),
+                  color: Colors.white,
+                  size: 20,
+                ),
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
             ),
         ],
       ),

@@ -73,17 +73,16 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
 
   Widget _buildAppBar(BuildContext context, ColorScheme colorScheme) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Row(
         children: [
           IconButton(
-            iconSize: 26,
+            iconSize: 24,
             icon: const Icon(FluentIcons.chevron_down_24_regular),
             style: IconButton.styleFrom(
-              backgroundColor: colorScheme.surfaceContainerHighest,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              backgroundColor: const Color(0xFF1E1E2A),
+              shape: const CircleBorder(),
+              padding: const EdgeInsets.all(12),
             ),
             onPressed: () => Navigator.pop(context),
           ),
