@@ -13,6 +13,9 @@ import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/url_launcher.dart';
 import 'package:musify/widgets/auto_format_text.dart';
+import 'package:open_file_plus/open_file_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:musify/widgets/auto_format_text.dart';
 
 const String checkUrl = 'https://api.github.com/repos/Nitesh87409/Nit-Music/releases/latest';
 
@@ -46,95 +49,216 @@ Future<void> checkAppUpdates() async {
       builder: (BuildContext context) {
         final colorScheme = Theme.of(context).colorScheme;
 
-        return AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  FluentIcons.arrow_download_24_regular,
-                  color: colorScheme.onPrimaryContainer,
-                  size: 32,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                context.l10n!.appUpdateIsAvailable,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'V$latestVersion',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onPrimaryContainer,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.sizeOf(context).height / 2.5,
-                ),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: SingleChildScrollView(
-                  child: AutoFormatText(text: releasesResponse['body']),
-                ),
-              ),
-            ],
-          ),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: <Widget>[
-            OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: colorScheme.outline),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(context.l10n!.cancel),
-            ),
-            FilledButton.icon(
-              onPressed: () {
-                getDownloadUrl(map).then(
-                  (url) => {launchURL(Uri.parse(url)), Navigator.pop(context)},
-                );
-              },
-              icon: const Icon(FluentIcons.arrow_download_20_regular),
-              label: Text(context.l10n!.download),
-            ),
-          ],
+        return _UpdateDialog(
+          latestVersion: latestVersion,
+          releasesResponse: releasesResponse,
+          map: map,
         );
       },
     );
   } catch (e, stackTrace) {
     logger.log('Error in checkAppUpdates', error: e, stackTrace: stackTrace);
+  }
+}
+
+class _UpdateDialog extends StatefulWidget {
+  const _UpdateDialog({
+    required this.latestVersion,
+    required this.releasesResponse,
+    required this.map,
+  });
+
+  final String latestVersion;
+  final Map<String, dynamic> releasesResponse;
+  final Map<String, dynamic> map;
+
+  @override
+  State<_UpdateDialog> createState() => _UpdateDialogState();
+}
+
+class _UpdateDialogState extends State<_UpdateDialog> {
+  bool _isDownloading = false;
+  double _progress = 0.0;
+  String _status = '';
+
+  Future<void> _startDownload() async {
+    setState(() {
+      _isDownloading = true;
+      _progress = 0.0;
+      _status = 'Getting download URL...';
+    });
+
+    try {
+      final url = await getDownloadUrl(widget.map);
+      if (url.isEmpty) {
+        setState(() {
+          _status = 'No APK found in release.';
+          _isDownloading = false;
+        });
+        return;
+      }
+
+      setState(() {
+        _status = 'Downloading...';
+      });
+
+      final dir = await getExternalStorageDirectory();
+      final savePath = '${dir?.path}/musify_update_${widget.latestVersion}.apk';
+      final file = File(savePath);
+
+      if (await file.exists()) {
+        await file.delete();
+      }
+
+      final request = http.Request('GET', Uri.parse(url));
+      final response = await http.Client().send(request);
+      final contentLength = response.contentLength;
+
+      int bytes = 0;
+      final sink = file.openWrite();
+
+      await response.stream.forEach((chunk) {
+        sink.add(chunk);
+        bytes += chunk.length;
+        if (contentLength != null) {
+          setState(() {
+            _progress = bytes / contentLength;
+            _status = 'Downloading... ${(_progress * 100).toStringAsFixed(1)}%';
+          });
+        }
+      });
+
+      await sink.flush();
+      await sink.close();
+
+      setState(() {
+        _status = 'Opening installer...';
+      });
+
+      final result = await OpenFile.open(savePath);
+      if (result.type != ResultType.done) {
+        setState(() {
+          _status = 'Error opening APK: ${result.message}';
+          _isDownloading = false;
+        });
+      } else {
+        if (mounted) Navigator.pop(context);
+      }
+    } catch (e) {
+      setState(() {
+        _status = 'Error: $e';
+        _isDownloading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return AlertDialog(
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              FluentIcons.arrow_download_24_regular,
+              color: colorScheme.onPrimaryContainer,
+              size: 32,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            context.l10n!.appUpdateIsAvailable,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 6,
+            ),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              'V${widget.latestVersion}',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onPrimaryContainer,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (!_isDownloading)
+            Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height / 2.5,
+              ),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: SingleChildScrollView(
+                child: AutoFormatText(text: widget.releasesResponse['body']),
+              ),
+            )
+          else
+            Column(
+              children: [
+                LinearProgressIndicator(
+                  value: _progress > 0 ? _progress : null,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _status,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+      actionsAlignment: MainAxisAlignment.center,
+      actions: <Widget>[
+        if (!_isDownloading) ...[
+          OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: colorScheme.outline),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(context.l10n!.cancel),
+          ),
+          FilledButton.icon(
+            onPressed: _startDownload,
+            icon: const Icon(FluentIcons.arrow_download_20_regular),
+            label: Text(context.l10n!.download),
+          ),
+        ],
+      ],
+    );
   }
 }
 

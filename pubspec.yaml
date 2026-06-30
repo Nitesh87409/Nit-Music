@@ -2,7 +2,7 @@ name: musify
 description: Music Streaming app made in Flutter!
 
 publish_to: 'none'
-version: 10.1.8+183 # run update.sh after changing the version
+version: 10.1.9+184 # run update.sh after changing the version
 
 environment:
   sdk: '>=3.12.0 <4.0.0'
@@ -28,6 +28,7 @@ dependencies:
   http: ^1.6.0
   intl: ^0.20.2
   just_audio: 0.10.5
+  open_file_plus: ^3.4.1+1
   path_provider: ^2.1.6
   receive_sharing_intent:
     path: ./packages/receive_sharing_intent
