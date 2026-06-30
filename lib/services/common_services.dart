@@ -107,6 +107,29 @@ Future<bool> _validateCachedUrl(String cachedUrl) async {
   }
 }
 
+Future<List> getTrendingSongs() async {
+  try {
+    // Use YouTube search to find trending Hindi music
+    final queries = [
+      'trending Hindi songs 2026',
+      'new Bollywood songs this week',
+      'latest Hindi music',
+    ];
+    final selectedQuery = (queries..shuffle()).first;
+    
+    final List<Video> searchResults = await ytClient.search.search(selectedQuery);
+    final trendingSongs = searchResults
+        .take(15)
+        .map((video) => returnSongLayout(0, video))
+        .toList();
+    
+    return trendingSongs;
+  } catch (e, stackTrace) {
+    logger.log('Error in getTrendingSongs', error: e, stackTrace: stackTrace);
+    return [];
+  }
+}
+
 Future<List> fetchSongsList(String searchQuery) async {
   try {
     // If not in cache, perform the search

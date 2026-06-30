@@ -464,4 +464,53 @@ List<Map<String, dynamic>> playlistsDB = [
         'https://image-cdn-ak.spotifycdn.com/image/ab67706c0000da84fa66fb0b18a66df9963b542b',
     'list': [],
   },
+  // ── Hindi / Bollywood / Indian Playlists ──
+  {
+    'ytid': 'PLcRN7uK9CFpOKBhg_KjRVIFjYNvnMMdRC',
+    'title': 'Bollywood Hits 2026',
+    'image': 'https://i.scdn.co/image/ab67706f00000003e8e28219724c2423afa4d320',
+    'list': [],
+  },
+  {
+    'ytid': 'PLJWzVU-aACBihcRl0K-NJBEgxEA3miUN_',
+    'title': 'Top Hindi Songs',
+    'image': 'https://i.scdn.co/image/ab67706f000000034d26d431869cabfc53c67d8e',
+    'list': [],
+  },
+  {
+    'ytid': 'PLgzTt0k8mXzEpBnHKZiblCAZw0BRr6bFt',
+    'title': 'Hindi Romantic Hits',
+    'image': 'https://i.scdn.co/image/ab67706f00000003ba77a93e73308e47e6468e3d',
+    'list': [],
+  },
+  {
+    'ytid': 'PLHuHXHyLu0QF0JHHKR5fRiSmAfU3PwhUz',
+    'title': 'Arijit Singh Hits',
+    'image': 'https://i.scdn.co/image/ab67616d0000b273c08202c50371e234d20caf62',
+    'list': [],
+  },
+  {
+    'ytid': 'PLJWzVU-aACBhRHiJvlSMqgah4mPNnfSHi',
+    'title': 'Punjabi Hits',
+    'image': 'https://i.scdn.co/image/ab67706f00000003e0b65e68c98e54eb30927590',
+    'list': [],
+  },
+  {
+    'ytid': 'PLJ0K9doh1Kig8C8qY3ydPQiMGPl5-t3br',
+    'title': 'Latest Hindi Songs 2026',
+    'image': 'https://i.scdn.co/image/ab67706f000000032a6fae93797e36402ae45d8e',
+    'list': [],
+  },
+  {
+    'ytid': 'PLcRN7uK9CFpPkvbhIMVCLVJZwkAclzYp3',
+    'title': 'Bollywood Party Mix',
+    'image': 'https://i.scdn.co/image/ab67706f00000003b70e0223f544b1faa2e95ed0',
+    'list': [],
+  },
+  {
+    'ytid': 'PLDo-JmvBzV1NP6HjTGkRkRv3FRRz0IsIq',
+    'title': 'Hindi Lofi & Chill',
+    'image': 'https://i.scdn.co/image/ab67706f0000000328f3caa600067067bb348a0a',
+    'list': [],
+  },
 ];
