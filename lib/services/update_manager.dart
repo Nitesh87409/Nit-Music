@@ -135,7 +135,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
         _status = 'Opening installer...';
       });
 
-      final result = await OpenFile.open(savePath);
+      final result = await OpenFilex.open(savePath);
       if (result.type != ResultType.done) {
         setState(() {
           _status = 'Error opening APK: ${result.message}';
