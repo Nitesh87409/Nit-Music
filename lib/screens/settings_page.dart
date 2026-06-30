@@ -82,11 +82,7 @@ class SettingsPage extends StatelessWidget {
           FluentIcons.weather_sunny_28_regular,
           onTap: () => _showThemeModePicker(context),
         ),
-        CustomBar(
-          context.l10n!.language,
-          FluentIcons.translate_24_regular,
-          onTap: () => _showLanguagePicker(context),
-        ),
+
         CustomBar(
           context.l10n!.audioQuality,
           FluentIcons.music_note_1_24_regular,
@@ -203,20 +199,6 @@ class SettingsPage extends StatelessWidget {
     return Column(
       children: [
         ValueListenableBuilder<bool>(
-          valueListenable: sponsorBlockSupport,
-          builder: (_, value, __) {
-            return CustomBar(
-              'SponsorBlock',
-              FluentIcons.cut_24_regular,
-              description: context.l10n!.sponsorBlockDescription,
-              trailing: Switch(
-                value: value,
-                onChanged: (value) => _toggleSponsorBlock(context, value),
-              ),
-            );
-          },
-        ),
-        ValueListenableBuilder<bool>(
           valueListenable: playNextSongAutomatically,
           builder: (_, value, __) {
             return CustomBar(
@@ -251,7 +233,7 @@ class SettingsPage extends StatelessWidget {
         ),
 
         _buildToolsSection(context),
-        _buildSponsorSection(context),
+
       ],
     );
   }
@@ -391,15 +373,6 @@ class SettingsPage extends StatelessWidget {
             }
           },
         ),
-      ],
-    );
-  }
-
-  Widget _buildSponsorSection(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      children: [
       ],
     );
   }
