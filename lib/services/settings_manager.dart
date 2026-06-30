@@ -7,8 +7,8 @@ import 'package:musify/utilities/language_utils.dart';
 
 // Preferences
 
-final shouldWeCheckUpdates = ValueNotifier<bool?>(
-  Hive.box('settings').get('shouldWeCheckUpdates', defaultValue: null),
+final shouldWeCheckUpdates = ValueNotifier<bool>(
+  Hive.box('settings').get('shouldWeCheckUpdates', defaultValue: true),
 );
 
 final playNextSongAutomatically = ValueNotifier<bool>(

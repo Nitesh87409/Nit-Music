@@ -173,21 +173,35 @@ class SettingsPage extends StatelessWidget {
           },
         ),
         if (!isFdroidBuild)
-          ValueListenableBuilder<bool?>(
+          ValueListenableBuilder<bool>(
             valueListenable: shouldWeCheckUpdates,
             builder: (_, value, __) {
-              return CustomBar(
-                context.l10n!.automaticUpdateChecks,
-                FluentIcons.arrow_sync_24_regular,
-                description: context.l10n!.automaticUpdateChecksDescription,
-                borderRadius: offlineMode.value
-                    ? commonCustomBarRadiusLast
-                    : BorderRadius.zero,
-                trailing: Switch(
-                  value: value ?? false,
-                  onChanged: (value) =>
-                      _toggleAutomaticUpdateChecks(context, value),
-                ),
+              return Column(
+                children: [
+                  CustomBar(
+                    context.l10n!.automaticUpdateChecks,
+                    FluentIcons.arrow_sync_24_regular,
+                    description: context.l10n!.automaticUpdateChecksDescription,
+                    borderRadius: BorderRadius.zero,
+                    trailing: Switch(
+                      value: value,
+                      onChanged: (value) =>
+                          _toggleAutomaticUpdateChecks(context, value),
+                    ),
+                  ),
+                  CustomBar(
+                    context.l10n!.checkUpdate,
+                    FluentIcons.arrow_sync_circle_24_regular,
+                    borderRadius: offlineMode.value
+                        ? commonCustomBarRadiusLast
+                        : BorderRadius.zero,
+                    onTap: () {
+                      if (kReleaseMode && !offlineMode.value) {
+                        checkAppUpdates();
+                      }
+                    },
+                  ),
+                ],
               );
             },
           ),
