@@ -1,5 +1,6 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:musify/constants/app_constants.dart';
@@ -190,7 +191,7 @@ class SettingsPage extends StatelessWidget {
                     ),
                   ),
                   CustomBar(
-                    context.l10n!.checkUpdate,
+                    context.l10n!.checkForUpdates,
                     FluentIcons.arrow_sync_circle_24_regular,
                     borderRadius: offlineMode.value
                         ? commonCustomBarRadiusLast
