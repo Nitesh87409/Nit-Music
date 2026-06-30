@@ -57,7 +57,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final playlistHeight = MediaQuery.sizeOf(context).height * 0.25 / 1.1;
     return Scaffold(
-      backgroundColor: const Color(0xFF09090E),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -116,47 +116,38 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildTopBar(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         IconButton(
           icon: const Icon(Icons.menu, color: Colors.white, size: 28),
-          padding: EdgeInsets.zero,
-          alignment: Alignment.centerLeft,
           onPressed: () {
             Scaffold.of(context).openDrawer();
           },
         ),
-        const SizedBox(width: 8),
-        Text.rich(
-          TextSpan(
-            children: [
-              const TextSpan(
-                text: 'Nit',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 28,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              WidgetSpan(
-                child: ShaderMask(
-                  shaderCallback: (bounds) => const LinearGradient(
-                    colors: [Color(0xFFA67CFF), Color(0xFF5A75FF)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ).createShader(bounds),
-                  child: const Text(
-                    'Music',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 28,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+        const SizedBox(width: 4),
+        const Text(
+          'Nit',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 26,
+            letterSpacing: -0.5,
+          ),
+        ),
+        ShaderMask(
+          shaderCallback: (bounds) => const LinearGradient(
+            colors: [Color(0xFFA67CFF), Color(0xFF5A75FF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ).createShader(bounds),
+          child: const Text(
+            'Music',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 26,
+              letterSpacing: -0.5,
+            ),
           ),
         ),
       ],
@@ -172,7 +163,7 @@ class _HomePageState extends State<HomePage> {
             child: Container(
               height: 52,
               decoration: BoxDecoration(
-                color: const Color(0xFF1E1E2A),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(26),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -358,7 +349,7 @@ class _HomePageState extends State<HomePage> {
             height: 140,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              color: const Color(0xFF1E1E2A),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               image: DecorationImage(
                 image: CachedNetworkImageProvider(imageUrl),
                 fit: BoxFit.cover,
@@ -490,7 +481,7 @@ class _HomePageState extends State<HomePage> {
               height: 56,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                color: const Color(0xFF1E1E2A),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 image: DecorationImage(
                   image: CachedNetworkImageProvider(imageUrl),
                   fit: BoxFit.cover,

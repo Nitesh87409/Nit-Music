@@ -167,9 +167,9 @@ class _BottomActionsRowState extends State<BottomActionsRow> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E1E2A),
+            color: colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white10, width: 1),
+            border: Border.all(color: colorScheme.outlineVariant, width: 1),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -217,14 +217,6 @@ class _BottomActionsRowState extends State<BottomActionsRow> {
               ),
               onPressed: onPressed,
             ),
-            if (tooltip != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                tooltip,
-                style: const TextStyle(fontSize: 10, color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
-            ],
           ],
         );
       },
@@ -252,14 +244,6 @@ class _BottomActionsRowState extends State<BottomActionsRow> {
           ),
           onPressed: onPressed,
         ),
-        if (tooltip != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            tooltip,
-            style: const TextStyle(fontSize: 10, color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-        ],
       ],
     );
   }
@@ -309,12 +293,6 @@ class _BottomActionsRowState extends State<BottomActionsRow> {
                   _showSleepTimerDialog(context);
                 }
               },
-            ),
-            const SizedBox(height: 4),
-            Text(
-              context.l10n!.sleepTimer,
-              style: const TextStyle(fontSize: 10, color: Colors.grey),
-              textAlign: TextAlign.center,
             ),
           ],
         );

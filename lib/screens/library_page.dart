@@ -50,7 +50,7 @@ class _LibraryPageState extends State<LibraryPage> {
           !hasOfflineSongs) {
         final colorScheme = Theme.of(context).colorScheme;
         return Scaffold(
-          backgroundColor: const Color(0xFF09090E),
+          backgroundColor: Theme.of(context).colorScheme.surface,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
@@ -100,7 +100,7 @@ class _LibraryPageState extends State<LibraryPage> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF09090E),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: AnimatedBuilder(
           animation: Listenable.merge([
@@ -193,8 +193,8 @@ class _LibraryPageState extends State<LibraryPage> {
               child: Container(
                 width: 44,
                 height: 44,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF1E1E2A),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -272,7 +272,7 @@ class _LibraryPageState extends State<LibraryPage> {
   Widget _buildActionGroup(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E2A),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(

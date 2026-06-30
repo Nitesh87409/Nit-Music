@@ -33,10 +33,10 @@ class _CustomSearchBarState extends State<CustomSearchBar> {
         elevation: WidgetStateProperty.all(0),
         shadowColor: WidgetStateProperty.all(Colors.transparent),
         backgroundColor: WidgetStateProperty.all(
-          const Color(0xFF1E1E2A),
+          colorScheme.surfaceContainerHighest,
         ),
         side: WidgetStateProperty.all(
-          const BorderSide(color: Colors.white10),
+          BorderSide(color: colorScheme.outlineVariant),
         ),
         overlayColor: WidgetStateProperty.all(
           const Color(0xFF8B5CF6).withOpacity(0.08),

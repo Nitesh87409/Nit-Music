@@ -77,7 +77,7 @@ class NowPlayingControls extends StatelessWidget {
                       children: [
                         MarqueeTextWidget(
                           text: metadata.title,
-                          fontColor: Colors.white,
+                          fontColor: colorScheme.onSurface,
                           fontSize: titleFontSize * fontScale,
                           fontWeight: FontWeight.bold,
                         ),
@@ -303,8 +303,8 @@ class PlayerControlButtons extends StatelessWidget {
                                       ? () => audioHandler.skipToPrevious()
                                       : null,
                                   style: IconButton.styleFrom(
-                                    backgroundColor: const Color(0xFF1E1E2A),
-                                    disabledBackgroundColor: const Color(0xFF1E1E2A),
+                                    backgroundColor: colorScheme.surfaceContainerHighest,
+                                    disabledBackgroundColor: colorScheme.surfaceContainerHighest,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
                                     ),
@@ -341,8 +341,8 @@ class PlayerControlButtons extends StatelessWidget {
                                       ? audioHandler.playAgain()
                                       : audioHandler.skipToNext(),
                                   style: IconButton.styleFrom(
-                                    backgroundColor: const Color(0xFF1E1E2A),
-                                    disabledBackgroundColor: const Color(0xFF1E1E2A),
+                                    backgroundColor: colorScheme.surfaceContainerHighest,
+                                    disabledBackgroundColor: colorScheme.surfaceContainerHighest,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
                                     ),
@@ -401,7 +401,7 @@ class PlayerControlButtons extends StatelessWidget {
           style: IconButton.styleFrom(
             backgroundColor: value
                 ? const Color(0xFF8B5CF6)
-                : const Color(0xFF1E1E2A),
+                : colorScheme.surfaceContainerHighest,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -452,7 +452,7 @@ class PlayerControlButtons extends StatelessWidget {
               style: IconButton.styleFrom(
                 backgroundColor: isActive
                     ? const Color(0xFF8B5CF6)
-                    : const Color(0xFF1E1E2A),
+                    : colorScheme.surfaceContainerHighest,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -551,7 +551,7 @@ class _LikeButtonState extends State<_LikeButton> {
         return IconButton(
           icon: Icon(
             isActive ? FluentIcons.heart_24_filled : FluentIcons.heart_24_regular,
-            color: isActive ? const Color(0xFF8B5CF6) : Colors.white70,
+            color: isActive ? const Color(0xFF8B5CF6) : Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           iconSize: 28,
           onPressed: () {

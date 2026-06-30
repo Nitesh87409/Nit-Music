@@ -121,7 +121,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                 ),
                 bottomNavigationBar: !isLargeScreen
                     ? NavigationBar(
-                        backgroundColor: const Color(0xFF09090E),
+                        backgroundColor: Theme.of(context).colorScheme.surface,
                         indicatorColor: Colors.transparent,
                         elevation: 0,
                         selectedIndex: _getCurrentIndex(items, isOfflineMode),

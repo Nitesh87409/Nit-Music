@@ -69,28 +69,32 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
   final isPureBlack =
       colorScheme.brightness == Brightness.dark && usePureBlackColor.value;
 
-  // Pure black / Dark Purple theme colors
-  const bgColorValue = Color(0xFF09090E);
-  const cardColorValue = Color(0xFF1E1E2A);
-  const containerHighValue = Color(0xFF2A2A35);
+  // Dark Purple theme colors
+  const darkBgColorValue = Color(0xFF09090E);
+  const darkCardColorValue = Color(0xFF1E1E2A);
+  const darkContainerHighValue = Color(0xFF2A2A35);
   const primaryColorValue = Color(0xFF8B5CF6);
 
-  final bgColor = bgColorValue;
-  final cardBgColor = cardColorValue;
+  final bgColor = isLight ? colorScheme.surface : darkBgColorValue;
+  final cardBgColor = isLight ? colorScheme.surfaceContainerLow : darkCardColorValue;
+  final containerHighColor = isLight ? colorScheme.surfaceContainerHigh : darkContainerHighValue;
 
-  // modified color scheme for pure black theme
-  final effectiveColorScheme = ColorScheme.dark(
-    primary: primaryColorValue,
-    onPrimary: Colors.white,
-    secondary: const Color(0xFF00E5FF),
-    onSecondary: Colors.black,
-    surface: bgColorValue,
-    surfaceContainerLowest: bgColorValue,
-    surfaceContainerLow: cardColorValue,
-    surfaceContainer: cardColorValue,
-    surfaceContainerHigh: containerHighValue,
-    surfaceContainerHighest: containerHighValue,
-  );
+  final effectiveColorScheme = isLight 
+    ? colorScheme.copyWith(
+        primary: primaryColorValue,
+      )
+    : ColorScheme.dark(
+        primary: primaryColorValue,
+        onPrimary: Colors.white,
+        secondary: const Color(0xFF00E5FF),
+        onSecondary: Colors.black,
+        surface: darkBgColorValue,
+        surfaceContainerLowest: darkBgColorValue,
+        surfaceContainerLow: darkCardColorValue,
+        surfaceContainer: darkCardColorValue,
+        surfaceContainerHigh: darkContainerHighValue,
+        surfaceContainerHighest: darkContainerHighValue,
+      );
 
   return ThemeData(
     scaffoldBackgroundColor: bgColor,
@@ -137,12 +141,12 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       thumbColor: Colors.white,
     ),
     bottomSheetTheme: base.bottomSheetTheme.copyWith(
-      backgroundColor: cardColorValue,
+      backgroundColor: cardBgColor,
     ),
     inputDecorationTheme: base.inputDecorationTheme.copyWith(
       filled: true,
       isDense: true,
-      fillColor: containerHighValue,
+      fillColor: containerHighColor,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -150,7 +154,7 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       contentPadding: const EdgeInsets.fromLTRB(18, 14, 20, 14),
     ),
     dialogTheme: base.dialogTheme.copyWith(
-      backgroundColor: cardColorValue,
+      backgroundColor: cardBgColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
     ),
     navigationBarTheme: base.navigationBarTheme.copyWith(
@@ -209,7 +213,7 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       ),
     ),
     popupMenuTheme: base.popupMenuTheme.copyWith(
-      color: cardColorValue,
+      color: cardBgColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
     dividerTheme: base.dividerTheme.copyWith(
