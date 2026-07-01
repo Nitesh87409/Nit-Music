@@ -123,8 +123,6 @@ class _LibraryPageState extends State<LibraryPage> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         const SizedBox(height: 16),
-                        _buildTopBar(context),
-                        const SizedBox(height: 24),
                         _buildSubHeader(context),
                         const SizedBox(height: 24),
                         _buildBanner(context),
@@ -149,24 +147,7 @@ class _LibraryPageState extends State<LibraryPage> {
     );
   }
 
-  Widget _buildTopBar(BuildContext context) {
-    return ShaderMask(
-      shaderCallback: (bounds) => const LinearGradient(
-        colors: [Colors.white, Color(0xFFA67CFF)],
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-      ).createShader(bounds),
-      child: const Text(
-        'Library',
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 32,
-          letterSpacing: -0.5,
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildSubHeader(BuildContext context) {
     return Row(
@@ -279,7 +260,7 @@ class _LibraryPageState extends State<LibraryPage> {
         children: [
           _buildActionTile(
             title: 'Recently played',
-            subtitle: '32 songs',
+            listNotifier: userRecentlyPlayed,
             icon: FluentIcons.history_24_regular,
             iconColor: const Color(0xFFA67CFF),
             backgroundColor: const Color(0xFF2C2442),
@@ -288,7 +269,7 @@ class _LibraryPageState extends State<LibraryPage> {
           Divider(color: Colors.white.withValues(alpha: 0.05), height: 1, indent: 72, endIndent: 16),
           _buildActionTile(
             title: 'Liked songs',
-            subtitle: '128 songs',
+            listNotifier: userLikedSongsList,
             icon: FluentIcons.heart_24_regular,
             iconColor: const Color(0xFFFF71A9),
             backgroundColor: const Color(0xFF421C2F),
@@ -297,7 +278,7 @@ class _LibraryPageState extends State<LibraryPage> {
           Divider(color: Colors.white.withValues(alpha: 0.05), height: 1, indent: 72, endIndent: 16),
           _buildActionTile(
             title: 'Offline songs',
-            subtitle: '48 songs',
+            listNotifier: userOfflineSongs,
             icon: FluentIcons.cloud_off_24_regular,
             iconColor: const Color(0xFF00E5FF),
             backgroundColor: const Color(0xFF123440),
@@ -310,7 +291,7 @@ class _LibraryPageState extends State<LibraryPage> {
 
   Widget _buildActionTile({
     required String title,
-    required String subtitle,
+    required ValueNotifier<List> listNotifier,
     required IconData icon,
     required Color iconColor,
     required Color backgroundColor,
@@ -346,12 +327,17 @@ class _LibraryPageState extends State<LibraryPage> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: Colors.grey.shade500,
-                      fontSize: 13,
-                    ),
+                  ValueListenableBuilder<List>(
+                    valueListenable: listNotifier,
+                    builder: (context, list, _) {
+                      return Text(
+                        '${list.length} songs',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 13,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

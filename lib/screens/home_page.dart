@@ -1,4 +1,4 @@
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+﻿import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:musify/constants/app_constants.dart';
@@ -72,10 +72,6 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(height: 16),
                     _buildTopBar(context),
                     const SizedBox(height: 24),
-                    _buildSearchBar(context),
-                    const SizedBox(height: 24),
-                    _buildGreetingBanner(context),
-                    const SizedBox(height: 32),
                     ValueListenableBuilder<String?>(
                       valueListenable: announcementURL,
                       builder: (_, _url, __) {
@@ -123,16 +119,16 @@ class _HomePageState extends State<HomePage> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         IconButton(
-          icon: const Icon(Icons.menu, color: Colors.white, size: 28),
+          icon: Icon(Icons.menu, color: Theme.of(context).colorScheme.onSurface, size: 28),
           onPressed: () {
             Scaffold.of(context).openDrawer();
           },
         ),
         const SizedBox(width: 4),
-        const Text(
+        Text(
           'Nit',
           style: TextStyle(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.bold,
             fontSize: 26,
             letterSpacing: -0.5,
@@ -144,10 +140,10 @@ class _HomePageState extends State<HomePage> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ).createShader(bounds),
-          child: const Text(
+          child: Text(
             'Music',
             style: TextStyle(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.bold,
               fontSize: 26,
               letterSpacing: -0.5,
@@ -179,7 +175,7 @@ class _HomePageState extends State<HomePage> {
                     child: Text(
                       'Search songs, artists, albums...',
                       style: TextStyle(
-                        color: Colors.grey.shade400,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 15,
                       ),
                     ),
@@ -199,7 +195,7 @@ class _HomePageState extends State<HomePage> {
           ),
           child: const Icon(
             FluentIcons.mic_24_filled, // Using mic icon as placeholder for waveform
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ],
@@ -225,10 +221,10 @@ class _HomePageState extends State<HomePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Good evening, Shivam 👋',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
@@ -237,7 +233,7 @@ class _HomePageState extends State<HomePage> {
                 Text(
                   'Let\'s play something amazing',
                   style: TextStyle(
-                    color: Colors.grey.shade400,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 13,
                   ),
                 ),
@@ -260,7 +256,7 @@ class _HomePageState extends State<HomePage> {
             ),
             child: const Icon(
               FluentIcons.play_24_filled,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               size: 24,
             ),
           ),
@@ -290,10 +286,10 @@ class _HomePageState extends State<HomePage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Your top mixes',
               style: TextStyle(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
               ),
@@ -305,7 +301,7 @@ class _HomePageState extends State<HomePage> {
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: const Text(
+              child: Text(
                 'See all',
                 style: TextStyle(
                   color: Color(0xFFA67CFF),
@@ -372,7 +368,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   child: const Icon(
                     FluentIcons.play_16_filled,
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                     size: 16,
                   ),
                 ),
@@ -385,7 +381,7 @@ class _HomePageState extends State<HomePage> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -394,7 +390,7 @@ class _HomePageState extends State<HomePage> {
           Text(
             'Mix',
             style: TextStyle(
-              color: Colors.grey.shade400,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 12,
             ),
           ),
@@ -424,7 +420,7 @@ class _HomePageState extends State<HomePage> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const Text('🔥', style: TextStyle(fontSize: 20)),
+                    Text('🔥', style: TextStyle(fontSize: 20)),
                   ],
                 ),
               ],
@@ -479,7 +475,7 @@ class _HomePageState extends State<HomePage> {
                                     ),
                                     child: const Icon(
                                       FluentIcons.play_16_filled,
-                                      color: Colors.white,
+                                      color: Theme.of(context).colorScheme.onSurface,
                                       size: 16,
                                     ),
                                   ),
@@ -541,10 +537,10 @@ class _HomePageState extends State<HomePage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Recommended for you',
               style: TextStyle(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
               ),
@@ -556,7 +552,7 @@ class _HomePageState extends State<HomePage> {
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: const Text(
+              child: Text(
                 'See all',
                 style: TextStyle(
                   color: Color(0xFFA67CFF),
@@ -620,7 +616,7 @@ class _HomePageState extends State<HomePage> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
@@ -631,7 +627,7 @@ class _HomePageState extends State<HomePage> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.grey.shade400,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 13,
                     ),
                   ),

@@ -7,6 +7,7 @@ import 'package:musify/services/common_services.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/async_loader.dart';
 import 'package:musify/widgets/song_artwork.dart';
+import 'package:musify/main.dart';
 
 class NowPlayingArtwork extends StatelessWidget {
   const NowPlayingArtwork({
@@ -38,11 +39,21 @@ class NowPlayingArtwork extends StatelessWidget {
 
     const borderRadius = 24.0;
 
-    return FlipCard(
-      rotateSide: RotateSide.right,
-      onTapFlipping: !offlineMode.value,
-      controller: lyricsController,
-      frontWidget: DecoratedBox(
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity != null) {
+          if (details.primaryVelocity! < 0) {
+            audioHandler.skipToNext();
+          } else if (details.primaryVelocity! > 0) {
+            audioHandler.skipToPrevious();
+          }
+        }
+      },
+      child: FlipCard(
+        rotateSide: RotateSide.right,
+        onTapFlipping: !offlineMode.value,
+        controller: lyricsController,
+        frontWidget: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(borderRadius),
           boxShadow: [
@@ -142,6 +153,7 @@ class NowPlayingArtwork extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
+          ),
           ),
         ),
       ),

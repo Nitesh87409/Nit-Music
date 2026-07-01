@@ -134,34 +134,6 @@ class _BottomActionsRowState extends State<BottomActionsRow> {
               ),
               tooltip: l10n.queue,
             ),
-          if (!offlineMode.value) ...[
-            _buildSimpleActionButton(
-              context: context,
-              icon: FluentIcons.text_quote_24_regular,
-              colorScheme: colorScheme,
-              size: responsiveIconSize,
-              onPressed: widget.lyricsController.flipcard,
-              tooltip: l10n.lyrics,
-            ),
-            _buildActionButton(
-              context: context,
-              icon: FluentIcons.heart_24_regular,
-              activeIcon: FluentIcons.heart_24_filled,
-              colorScheme: colorScheme,
-              size: responsiveIconSize,
-              statusNotifier: _songLikeStatus,
-              activeColor: colorScheme.primary,
-              onPressed: () {
-                updateSongLikeStatus(
-                  widget.audioId,
-                  !_songLikeStatus.value,
-                  songData: mediaItemToMap(widget.metadata),
-                );
-                _songLikeStatus.value = !_songLikeStatus.value;
-              },
-              tooltip: l10n.likedSongs,
-            ),
-          ],
         ];
 
         return Container(

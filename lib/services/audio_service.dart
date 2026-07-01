@@ -638,7 +638,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
 
         // Clear the expired flag so future song completions are not
         // blocked after a sleep timer fired in a previous session.
-        // Do NOT touch sleepTimerEndOfSong here — 'ready' fires not
+        // Do NOT touch sleepTimerEndOfSong here ï¿½ 'ready' fires not
         // only for new songs but also on buffering recovery within the
         // same song, which would cancel an active "end of song" timer.
         sleepTimerExpired = false;
@@ -713,6 +713,11 @@ class MusifyAudioHandler extends BaseAudioHandler {
           if (!audioPlayer.playing) {
             return;
           }
+          
+          // Check if we already have 10 upcoming songs in the queue
+          if ((_queueList.length - 1) - _currentQueueIndex >= 10) {
+            return;
+          }
 
           final baseSong = _getCurrentSongForRecommendations();
           if (baseSong == null) {
@@ -733,10 +738,17 @@ class MusifyAudioHandler extends BaseAudioHandler {
             return;
           }
 
-          if (nextRecommendedSong != null) {
-            final songToAdd = nextRecommendedSong;
-            nextRecommendedSong = null;
-            await _insertRecommendedSong(songToAdd);
+          if (nextRecommendedSongs.isNotEmpty) {
+            final songsToAdd = List.from(nextRecommendedSongs);
+            nextRecommendedSongs.clear();
+            
+            // Filter out songs that are already in the queue to prevent repeats
+            final existingYtIds = _queueList.map((s) => s['ytid'].toString()).toSet();
+            final uniqueSongsToAdd = songsToAdd.where((s) => !existingYtIds.contains(s['ytid'].toString())).toList();
+
+            for (final songToAdd in uniqueSongsToAdd) {
+              await _insertRecommendedSong(songToAdd);
+            }
           }
         } catch (e, stackTrace) {
           logger.log(
@@ -1357,7 +1369,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
       ? _queueList[_currentQueueIndex]
       : null;
 
-  bool get hasNext => _currentQueueIndex < _queueList.length - 1;
+  bool get hasNext => _currentQueueIndex < _queueList.length - 1 || repeatNotifier.value != AudioServiceRepeatMode.none || playNextSongAutomatically.value;
 
   bool get hasPrevious => _currentQueueIndex > 0 || _historyList.isNotEmpty;
 
@@ -1938,7 +1950,7 @@ class MusifyAudioHandler extends BaseAudioHandler {
 
       if (isOffline) {
         // If offline mode is explicitly enabled, do not attempt any online
-        // fallback — respect the user's offline-only preference.
+        // fallback ï¿½ respect the user's offline-only preference.
         try {
           if (offlineMode.value) {
             return false;

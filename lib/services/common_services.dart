@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -30,7 +30,7 @@ ValueNotifier<List> userOfflineSongs = ValueNotifier<List>(
   Hive.box('userNoBackup').get('offlineSongs', defaultValue: []),
 );
 
-dynamic nextRecommendedSong;
+
 
 var _songLikeUpdateToken = 0;
 final _latestSongLikeUpdateTokens = <String, int>{};
@@ -484,13 +484,18 @@ Future<List<Map<String, int>>> getSkipSegments(String id) async {
   }
 }
 
+List<dynamic> nextRecommendedSongs = [];
+
+var _songLikeUpdateToken = 0;
+final _latestSongLikeUpdateTokens = <String, int>{};
+
 Future<void> getSimilarSong(String songYtId) async {
   try {
     final song = await ytClient.videos.get(songYtId);
     final relatedSongs = await ytClient.videos.getRelatedVideos(song) ?? [];
 
     if (relatedSongs.isNotEmpty) {
-      nextRecommendedSong = returnSongLayout(0, relatedSongs[0]);
+      nextRecommendedSongs = relatedSongs.take(10).map((s) => returnSongLayout(0, s)).toList();
     } else {
       logger.log('No related songs found for $songYtId');
     }

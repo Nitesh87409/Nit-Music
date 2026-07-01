@@ -42,28 +42,35 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
               return const Center(child: CircularProgressIndicator());
             }
             final metadata = snapshot.data!;
-            return Column(
-              children: [
-                _buildAppBar(context, colorScheme),
-                Expanded(
-                  child: isLargeScreen
-                      ? _DesktopLayout(
-                          metadata: metadata,
-                          size: size,
-                          adjustedIconSize: baseIconSize,
-                          adjustedMiniIconSize: miniIconSize,
-                          lyricsController: _lyricsController,
-                        )
-                      : _MobileLayout(
-                          metadata: metadata,
-                          size: size,
-                          adjustedIconSize: baseIconSize,
-                          adjustedMiniIconSize: miniIconSize,
-                          isLargeScreen: isLargeScreen,
-                          lyricsController: _lyricsController,
-                        ),
-                ),
-              ],
+            return GestureDetector(
+              onVerticalDragEnd: (details) {
+                if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
+                  Navigator.pop(context);
+                }
+              },
+              child: Column(
+                children: [
+                  _buildAppBar(context, colorScheme),
+                  Expanded(
+                    child: isLargeScreen
+                        ? _DesktopLayout(
+                            metadata: metadata,
+                            size: size,
+                            adjustedIconSize: baseIconSize,
+                            adjustedMiniIconSize: miniIconSize,
+                            lyricsController: _lyricsController,
+                          )
+                        : _MobileLayout(
+                            metadata: metadata,
+                            size: size,
+                            adjustedIconSize: baseIconSize,
+                            adjustedMiniIconSize: miniIconSize,
+                            isLargeScreen: isLargeScreen,
+                            lyricsController: _lyricsController,
+                          ),
+                  ),
+                ],
+              ),
             );
           },
         ),
