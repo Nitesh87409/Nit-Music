@@ -193,7 +193,7 @@ class _HomePageState extends State<HomePage> {
             color: Color(0xFF8B5CF6),
             shape: BoxShape.circle,
           ),
-          child: const Icon(
+          child: Icon(
             FluentIcons.mic_24_filled, // Using mic icon as placeholder for waveform
             color: Theme.of(context).colorScheme.onSurface,
           ),
@@ -254,7 +254,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
-            child: const Icon(
+            child: Icon(
               FluentIcons.play_24_filled,
               color: Theme.of(context).colorScheme.onSurface,
               size: 24,
@@ -366,7 +366,7 @@ class _HomePageState extends State<HomePage> {
                     color: Colors.black87,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     FluentIcons.play_16_filled,
                     color: Theme.of(context).colorScheme.onSurface,
                     size: 16,
@@ -380,7 +380,7 @@ class _HomePageState extends State<HomePage> {
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               color: Theme.of(context).colorScheme.onSurface,
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -473,7 +473,7 @@ class _HomePageState extends State<HomePage> {
                                       color: Colors.black87,
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(
+                                    child: Icon(
                                       FluentIcons.play_16_filled,
                                       color: Theme.of(context).colorScheme.onSurface,
                                       size: 16,
@@ -615,7 +615,7 @@ class _HomePageState extends State<HomePage> {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
@@ -648,3 +648,4 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
+

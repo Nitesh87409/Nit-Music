@@ -486,9 +486,6 @@ Future<List<Map<String, int>>> getSkipSegments(String id) async {
 
 List<dynamic> nextRecommendedSongs = [];
 
-var _songLikeUpdateToken = 0;
-final _latestSongLikeUpdateTokens = <String, int>{};
-
 Future<void> getSimilarSong(String songYtId) async {
   try {
     final song = await ytClient.videos.get(songYtId);
@@ -903,3 +900,4 @@ Future<void> removeFromRecentlyPlayed(dynamic songId) async {
     );
   }
 }
+
