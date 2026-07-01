@@ -709,13 +709,9 @@ class MusifyAudioHandler extends BaseAudioHandler {
     unawaited(
       Future.microtask(() async {
         try {
-          // Only add songs if we're still playing
-          if (!audioPlayer.playing) {
-            return;
-          }
-          
-          // Check if we already have 10 upcoming songs in the queue
-          if ((_queueList.length - 1) - _currentQueueIndex >= 10) {
+          // Check if we already have 20 upcoming songs in the queue
+          final upcomingSongs = (_queueList.length - 1) - _currentQueueIndex;
+          if (upcomingSongs >= 20) {
             return;
           }
 
@@ -726,17 +722,11 @@ class MusifyAudioHandler extends BaseAudioHandler {
 
           // Fetch similar songs silently in the background
           await getSimilarSong(baseSong['ytid']).timeout(
-            const Duration(seconds: 10),
+            const Duration(seconds: 15),
             onTimeout: () {
               logger.log('Background song fetch timed out');
             },
           );
-
-          // If we got a recommendation, add it to the queue
-          // But only if still playing (user might have paused during fetch)
-          if (!audioPlayer.playing) {
-            return;
-          }
 
           if (nextRecommendedSongs.isNotEmpty) {
             final songsToAdd = List.from(nextRecommendedSongs);
@@ -1247,10 +1237,8 @@ class MusifyAudioHandler extends BaseAudioHandler {
         if (success) {
           _consecutiveErrors = 0;
           _preloadUpcomingSongs();
-          // Trigger background song addition if auto-play is enabled
-          if (playNextSongAutomatically.value) {
-            unawaited(_backgroundAddSongsToQueue());
-          }
+          // Always add recommended songs to queue so next button works
+          unawaited(_backgroundAddSongsToQueue());
         } else {
           _currentQueueIndex = previousQueueIndex;
           if (previousMediaItem != null) {
