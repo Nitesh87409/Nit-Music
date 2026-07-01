@@ -7,6 +7,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
+import 'package:musify/utilities/formatter.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/no_artwork_cube.dart';
 
@@ -362,6 +363,26 @@ class QueueTile extends StatelessWidget {
   static const double _artSize = 46;
   static const double _artRadius = 10;
 
+  String get _subtitle {
+    final artistName = song['artist']?.toString() ?? '';
+    final duration = song['duration'];
+
+    int? durationInt;
+    if (duration is int) {
+      durationInt = duration;
+    } else if (duration is String) {
+      durationInt = int.tryParse(duration);
+    }
+
+    if (durationInt != null && durationInt > 0) {
+      final formattedDuration = formatDuration(durationInt);
+      return artistName.isNotEmpty
+          ? '$artistName • $formattedDuration'
+          : formattedDuration;
+    }
+    return artistName;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dismissible(
@@ -417,7 +438,7 @@ class QueueTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        song['artist']?.toString() ?? '',
+                        _subtitle,
                         style: TextStyle(
                           color: colorScheme.onSurfaceVariant,
                           fontSize: 12,
@@ -492,7 +513,7 @@ class _ArtworkThumbnail extends StatelessWidget {
     if (imageUrl.isEmpty) return _fallback();
     // Low-res YouTube 'default.jpg' thumbnails ship with baked-in black
     // letterbox bars, so BoxFit.cover keeps them visible. Detect that case and
-    // stretch over the bars with fill + centerSlice, otherwise crop with cover �
+    // stretch over the bars with fill + centerSlice, otherwise crop with cover —
     // matching SongBar so the queue frames covers the same way (no black bars).
     final isImageSmall = imageUrl.contains('default.jpg');
     return CachedNetworkImage(

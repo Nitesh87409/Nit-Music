@@ -171,7 +171,11 @@ Future<List> _getRecommendationsFromRecentlyPlayed() async {
     try {
       final song = await ytClient.videos.get(songData['ytid']);
       final relatedSongs = await ytClient.videos.getRelatedVideos(song) ?? [];
-      return relatedSongs.take(3).map((s) => returnSongLayout(0, s)).toList();
+      return relatedSongs
+          .where((s) => s.duration != null && s.duration!.inMinutes <= 15)
+          .take(3)
+          .map((s) => returnSongLayout(0, s))
+          .toList();
     } catch (e, stackTrace) {
       logger.log(
         'Error getting related videos for ${songData['ytid']}',
@@ -492,7 +496,11 @@ Future<void> getSimilarSong(String songYtId) async {
     final relatedSongs = await ytClient.videos.getRelatedVideos(song) ?? [];
 
     if (relatedSongs.isNotEmpty) {
-      nextRecommendedSongs = relatedSongs.take(20).map((s) => returnSongLayout(0, s)).toList();
+      nextRecommendedSongs = relatedSongs
+          .where((s) => s.duration != null && s.duration!.inMinutes <= 15)
+          .take(20)
+          .map((s) => returnSongLayout(0, s))
+          .toList();
     } else {
       logger.log('No related songs found for $songYtId');
     }
@@ -900,4 +908,5 @@ Future<void> removeFromRecentlyPlayed(dynamic songId) async {
     );
   }
 }
+
 
