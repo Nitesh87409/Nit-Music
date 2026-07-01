@@ -702,40 +702,46 @@ class MusifyAudioHandler extends BaseAudioHandler {
   }
 
   Future<void> _backgroundAddSongsToQueue() async {
-    // Fire and forget - this runs as a background task without blocking playback
-    if (offlineMode.value) return;
+    logger.log('Starting _backgroundAddSongsToQueue');
+    if (offlineMode.value) {
+      logger.log('_backgroundAddSongsToQueue: offlineMode is true, aborting');
+      return;
+    }
 
-    // Use microtask to avoid blocking the current operation
     unawaited(
       Future.microtask(() async {
         try {
-          // Check if we already have 20 upcoming songs in the queue
           final upcomingSongs = (_queueList.length - 1) - _currentQueueIndex;
+          logger.log('_backgroundAddSongsToQueue: upcomingSongs = $upcomingSongs');
           if (upcomingSongs >= 20) {
             return;
           }
 
           final baseSong = _getCurrentSongForRecommendations();
           if (baseSong == null) {
+            logger.log('_backgroundAddSongsToQueue: baseSong is null');
             return;
           }
+          
+          final ytid = baseSong['ytid'];
+          logger.log('_backgroundAddSongsToQueue: fetching for ytid $ytid');
 
-          // Fetch similar songs silently in the background
-          await getSimilarSong(baseSong['ytid']).timeout(
+          await getSimilarSong(ytid).timeout(
             const Duration(seconds: 15),
             onTimeout: () {
-              logger.log('Background song fetch timed out');
+              logger.log('Background song fetch timed out for $ytid');
             },
           );
 
+          logger.log('_backgroundAddSongsToQueue: nextRecommendedSongs length = ${nextRecommendedSongs.length}');
           if (nextRecommendedSongs.isNotEmpty) {
             final songsToAdd = List.from(nextRecommendedSongs);
             nextRecommendedSongs.clear();
             
-            // Filter out songs that are already in the queue to prevent repeats
             final existingYtIds = _queueList.map((s) => s['ytid'].toString()).toSet();
             final uniqueSongsToAdd = songsToAdd.where((s) => !existingYtIds.contains(s['ytid'].toString())).toList();
 
+            logger.log('_backgroundAddSongsToQueue: uniqueSongsToAdd length = ${uniqueSongsToAdd.length}');
             for (final songToAdd in uniqueSongsToAdd) {
               await _insertRecommendedSong(songToAdd);
             }
@@ -1912,10 +1918,14 @@ class MusifyAudioHandler extends BaseAudioHandler {
           wasPlaying: wasPlayingBeforeSwap,
         )
         ..startListeningSession(song, duration: audioPlayer.duration);
-      await audioPlayer.play().catchError((Object e, StackTrace stackTrace) {
-        logger.log('Error starting playback', error: e, stackTrace: stackTrace);
-        _lastError = e.toString();
-      });
+      
+      unawaited(
+        audioPlayer.play().catchError((Object e, StackTrace stackTrace) {
+          logger.log('Error starting playback', error: e, stackTrace: stackTrace);
+          _lastError = e.toString();
+        }),
+      );
+      
       unawaited(updateRecentlyPlayed(song['ytid'], songFallback: song));
 
       if (!isOffline) {

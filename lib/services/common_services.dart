@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -492,7 +492,7 @@ Future<void> getSimilarSong(String songYtId) async {
     final relatedSongs = await ytClient.videos.getRelatedVideos(song) ?? [];
 
     if (relatedSongs.isNotEmpty) {
-      nextRecommendedSongs = relatedSongs.take(10).map((s) => returnSongLayout(0, s)).toList();
+      nextRecommendedSongs = relatedSongs.take(20).map((s) => returnSongLayout(0, s)).toList();
     } else {
       logger.log('No related songs found for $songYtId');
     }
