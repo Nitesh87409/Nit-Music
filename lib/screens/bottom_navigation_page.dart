@@ -52,17 +52,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> with Ticker
     );
   }
 
-  @override
-  void didUpdateWidget(covariant BottomNavigationPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.navigationShell.currentIndex != oldWidget.navigationShell.currentIndex) {
-      _animationController.animateTo(
-        widget.navigationShell.currentIndex.toDouble(),
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.fastOutSlowIn,
-      );
-    }
-  }
+
 
   @override
   void dispose() {
@@ -80,6 +70,11 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> with Ticker
         final currentIndex = widget.navigationShell.currentIndex;
         if (currentIndex != 0) {
           widget.navigationShell.goBranch(0);
+          _animationController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.fastOutSlowIn,
+          );
         } else {
           SystemNavigator.pop();
         }
@@ -141,27 +136,9 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> with Ticker
                                       bottom: bottomPadding,
                                     ),
                                   ),
-                                  child: AnimatedBuilder(
-                                    animation: _animation,
-                                    builder: (context, child) {
-                                      return Stack(
-                                        children: List.generate(widget.children.length, (index) {
-                                          final distance = (_animation.value - index).abs();
-                                          final isVisible = distance < 1.0;
-                                          
-                                          return Offstage(
-                                            offstage: !isVisible,
-                                            child: TickerMode(
-                                              enabled: isVisible,
-                                              child: Opacity(
-                                                opacity: (1.0 - distance).clamp(0.0, 1.0),
-                                                child: widget.children[index],
-                                              ),
-                                            ),
-                                          );
-                                        }),
-                                      );
-                                    },
+                                  child: IndexedStack(
+                                    index: widget.navigationShell.currentIndex,
+                                    children: widget.children,
                                   ),
                                 ),
                                 const Padding(
@@ -260,6 +237,13 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> with Ticker
 
       // Close any open bottom sheet before switching tabs
       closeCurrentBottomSheet();
+
+      // Animate the bottom bar pill indicator to this tab
+      _animationController.animateTo(
+        index.toDouble(),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.fastOutSlowIn,
+      );
 
       // If user taps the same tab again, reset it to initial state.
       // Otherwise, preserve the branch state.

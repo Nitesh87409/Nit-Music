@@ -62,8 +62,13 @@ class _HomePageState extends State<HomePage> {
     }
     try {
       final palette = await PaletteGenerator.fromImageProvider(
-        NetworkImage(item!.artUri!.toString()),
-        maximumColorCount: 5,
+        ResizeImage(
+          NetworkImage(item!.artUri!.toString()),
+          width: 50,
+          height: 50,
+        ),
+        maximumColorCount: 3,
+        timeout: const Duration(seconds: 3),
       );
       if (mounted) {
         setState(() {
@@ -341,7 +346,7 @@ class _HomePageState extends State<HomePage> {
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 190,
+          height: 200,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: itemsNumber,
@@ -454,7 +459,7 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 16),
             SizedBox(
-              height: 190,
+              height: 200,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: data.length,
