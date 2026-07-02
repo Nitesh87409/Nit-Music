@@ -11,6 +11,7 @@ import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
+import 'package:musify/services/search_recommendation_service.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/widgets/artist_bar.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
@@ -45,6 +46,18 @@ void reloadSearchHistoryFromStorage() {
   ).get('searchHistory', defaultValue: []);
 }
 
+// ─── Mood Chip definitions ───
+const List<Map<String, String>> _moodChips = [
+  {'label': '🎧 Workout', 'query': 'workout songs'},
+  {'label': '💔 Sad', 'query': 'sad songs hindi'},
+  {'label': '🚗 Drive', 'query': 'drive songs'},
+  {'label': '🔥 Trending', 'query': 'trending songs'},
+  {'label': '🧘 Lofi', 'query': 'lofi songs'},
+  {'label': '🎉 Party', 'query': 'party songs'},
+  {'label': '🙏 Bhakti', 'query': 'bhakti songs hindi'},
+  {'label': '🎵 Bollywood', 'query': 'bollywood hits'},
+];
+
 class _SearchPageState extends State<SearchPage> {
   final TextEditingController _searchBar = TextEditingController();
   final FocusNode _inputNode = FocusNode();
@@ -57,6 +70,46 @@ class _SearchPageState extends State<SearchPage> {
   List<String> _suggestionsList = [];
   Timer? _debounce;
   int _latestSuggestionRequest = 0;
+
+  // Smart recommendations
+  List<dynamic> _recommendations = [];
+  bool _isLoadingRecommendations = true;
+
+  // History visibility (Google-style: show only on focus)
+  bool _isHistoryVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _inputNode.addListener(_onFocusChange);
+    _loadRecommendations();
+  }
+
+  void _onFocusChange() {
+    if (mounted) {
+      setState(() {
+        _isHistoryVisible = _inputNode.hasFocus;
+      });
+    }
+  }
+
+  Future<void> _loadRecommendations() async {
+    try {
+      final results = await getSmartSearchRecommendations();
+      if (mounted) {
+        setState(() {
+          _recommendations = results;
+          _isLoadingRecommendations = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingRecommendations = false;
+        });
+      }
+    }
+  }
 
   Future<void> _submitSearch([String? query]) async {
     if (query != null) {
@@ -77,6 +130,7 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
+    _inputNode.removeListener(_onFocusChange);
     _searchBar.dispose();
     _inputNode.dispose();
     _fetchingSongs.dispose();
@@ -103,6 +157,9 @@ class _SearchPageState extends State<SearchPage> {
       searchHistoryNotifier.value = updatedHistory;
       unawaited(addOrUpdateData<List>('user', 'searchHistory', updatedHistory));
     }
+
+    // Update search frequency for smart recommendations
+    unawaited(updateSearchFrequency(query));
 
     try {
       final results = await Future.wait<List<dynamic>>([
@@ -152,147 +209,391 @@ class _SearchPageState extends State<SearchPage> {
     return [];
   }
 
+  bool get _hasSearchResults =>
+      _songsSearchResult.isNotEmpty ||
+      _artistsSearchResult.isNotEmpty ||
+      _albumsSearchResult.isNotEmpty ||
+      _playlistsSearchResult.isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n!.search)),
-      body: SingleChildScrollView(
-        padding: commonSingleChildScrollViewPadding,
-        child: Column(
-          children: <Widget>[
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isWide = constraints.maxWidth > 600;
-                final bar = ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: isWide ? 600 : double.infinity,
-                  ),
-                  child: CustomSearchBar(
-                    loadingProgressNotifier: _fetchingSongs,
-                    controller: _searchBar,
-                    focusNode: _inputNode,
-                    labelText: '${context.l10n!.search}...',
-                    onChanged: (value) {
-                      // debounce suggestions to avoid rapid API calls
-                      _debounce?.cancel();
-                      final query = value;
-                      final requestId = ++_latestSuggestionRequest;
+      body: GestureDetector(
+        onTap: _inputNode.unfocus,
+        behavior: HitTestBehavior.translucent,
+        child: SingleChildScrollView(
+          padding: commonSingleChildScrollViewPadding,
+          child: Column(
+            children: <Widget>[
+              // ─── Search Bar ───
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth > 600;
+                  final bar = ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isWide ? 600 : double.infinity,
+                    ),
+                    child: CustomSearchBar(
+                      loadingProgressNotifier: _fetchingSongs,
+                      controller: _searchBar,
+                      focusNode: _inputNode,
+                      labelText: '${context.l10n!.search}...',
+                      onChanged: (value) {
+                        // debounce suggestions to avoid rapid API calls
+                        _debounce?.cancel();
+                        final query = value;
+                        final requestId = ++_latestSuggestionRequest;
 
-                      // Clear suggestions immediately if input is empty
-                      if (query.isEmpty) {
-                        _suggestionsList = [];
-                        if (mounted) setState(() {});
-                        return;
-                      }
-
-                      _debounce = Timer(
-                        const Duration(milliseconds: 300),
-                        () async {
-                          final searchSuggestions = await getSearchSuggestions(
-                            query,
-                          );
-
-                          if (!mounted ||
-                              requestId != _latestSuggestionRequest ||
-                              _searchBar.text != query) {
-                            return;
-                          }
-
-                          _suggestionsList = List<String>.from(
-                            searchSuggestions,
-                          );
+                        // Clear suggestions immediately if input is empty
+                        if (query.isEmpty) {
+                          _suggestionsList = [];
                           if (mounted) setState(() {});
-                        },
-                      );
-                    },
-                    onSubmitted: (String value) {
-                      _submitSearch();
-                    },
-                  ),
-                );
-                if (isWide) {
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [bar],
-                  );
-                } else {
-                  return bar;
-                }
-              },
-            ),
+                          return;
+                        }
 
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child:
-                  (_suggestionsList.isNotEmpty ||
-                      (_songsSearchResult.isEmpty &&
-                          _artistsSearchResult.isEmpty &&
-                          _albumsSearchResult.isEmpty &&
-                          _playlistsSearchResult.isEmpty))
-                  ? ValueListenableBuilder<List>(
-                      valueListenable: searchHistoryNotifier,
-                      builder: (context, searchHistory, _) {
-                        final items = _suggestionsList.isEmpty
-                            ? searchHistory
-                            : _suggestionsList;
+                        _debounce = Timer(
+                          const Duration(milliseconds: 300),
+                          () async {
+                            final searchSuggestions = await getSearchSuggestions(
+                              query,
+                            );
 
-                        return Column(
-                          key: ValueKey(
-                            'history-${_suggestionsList.length}-${_searchBar.text}-${searchHistory.length}',
-                          ),
-                          children: [
-                            for (int index = 0; index < items.length; index++)
-                              Builder(
-                                builder: (context) {
-                                  final query = items[index];
-                                  final borderRadius = getItemBorderRadius(
-                                    index,
-                                    items.length,
-                                  );
+                            if (!mounted ||
+                                requestId != _latestSuggestionRequest ||
+                                _searchBar.text != query) {
+                              return;
+                            }
 
-                                  return CustomBar(
-                                    query,
-                                    FluentIcons.search_24_regular,
-                                    borderRadius: borderRadius,
-                                    onTap: () async {
-                                      await _submitSearch(query.toString());
-                                    },
-                                    onLongPress: () async {
-                                      final confirm =
-                                          await _showConfirmationDialog(
-                                            context,
-                                          ) ??
-                                          false;
-                                      if (confirm &&
-                                          searchHistory.contains(query)) {
-                                        final updatedHistory = List.from(
-                                          searchHistory,
-                                        )..remove(query);
-                                        searchHistoryNotifier.value =
-                                            updatedHistory;
-                                        unawaited(
-                                          addOrUpdateData<List>(
-                                            'user',
-                                            'searchHistory',
-                                            updatedHistory,
-                                          ),
-                                        );
-                                      }
-                                    },
-                                  );
-                                },
-                              ),
-                          ],
+                            _suggestionsList = List<String>.from(
+                              searchSuggestions,
+                            );
+                            if (mounted) setState(() {});
+                          },
                         );
                       },
-                    )
-                  : _buildSearchResults(context, primaryColor),
-            ),
-            const MiniPlayerBottomSpace(),
-          ],
+                      onSubmitted: (String value) {
+                        _submitSearch();
+                      },
+                    ),
+                  );
+                  if (isWide) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [bar],
+                    );
+                  } else {
+                    return bar;
+                  }
+                },
+              ),
+
+              // ─── Main Content Area ───
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: _suggestionsList.isNotEmpty
+                    // Show API suggestions when user is typing
+                    ? _buildSuggestionsList(colorScheme)
+                    : _hasSearchResults
+                        // Show search results
+                        ? _buildSearchResults(context, primaryColor)
+                        // Show home screen (history dropdown + chips + recommendations)
+                        : _buildHomeContent(context, primaryColor, colorScheme),
+              ),
+              const MiniPlayerBottomSpace(),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  // ─── Suggestions List (while typing) ───
+  Widget _buildSuggestionsList(ColorScheme colorScheme) {
+    return Column(
+      key: ValueKey('suggestions-${_suggestionsList.length}-${_searchBar.text}'),
+      children: [
+        for (int index = 0; index < _suggestionsList.length; index++)
+          Builder(
+            builder: (context) {
+              final query = _suggestionsList[index];
+              final borderRadius = getItemBorderRadius(
+                index,
+                _suggestionsList.length,
+              );
+              return CustomBar(
+                query,
+                FluentIcons.search_24_regular,
+                borderRadius: borderRadius,
+                onTap: () async {
+                  await _submitSearch(query);
+                },
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  // ─── Home Content (no search results, empty search bar) ───
+  Widget _buildHomeContent(
+    BuildContext context,
+    Color primaryColor,
+    ColorScheme colorScheme,
+  ) {
+    return Column(
+      key: const ValueKey('home-content'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ─── Compact Google-style History Dropdown (only on focus) ───
+        _buildCompactHistory(colorScheme),
+
+        // ─── Mood & Genre Chips ───
+        _buildMoodChips(colorScheme),
+
+        // ─── Smart Recommendations ───
+        _buildRecommendations(primaryColor),
+      ],
+    );
+  }
+
+  // ─── Compact Search History (Google-style) ───
+  Widget _buildCompactHistory(ColorScheme colorScheme) {
+    return ValueListenableBuilder<List>(
+      valueListenable: searchHistoryNotifier,
+      builder: (context, history, _) {
+        if (!_isHistoryVisible || history.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        // Show max 6 compact items
+        final displayItems = history.take(6).toList();
+
+        return AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (int i = 0; i < displayItems.length; i++)
+                  InkWell(
+                    onTap: () async {
+                      await _submitSearch(displayItems[i].toString());
+                    },
+                    onLongPress: () async {
+                      final confirm =
+                          await _showConfirmationDialog(context) ?? false;
+                      if (confirm && history.contains(displayItems[i])) {
+                        final updatedHistory = List.from(history)
+                          ..remove(displayItems[i]);
+                        searchHistoryNotifier.value = updatedHistory;
+                        unawaited(
+                          addOrUpdateData<List>(
+                            'user',
+                            'searchHistory',
+                            updatedHistory,
+                          ),
+                        );
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            FluentIcons.history_24_regular,
+                            size: 18,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              displayItems[i].toString(),
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: colorScheme.onSurface,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              // Insert text into search bar
+                              _searchBar.text = displayItems[i].toString();
+                              _searchBar.selection =
+                                  TextSelection.fromPosition(
+                                TextPosition(
+                                  offset: _searchBar.text.length,
+                                ),
+                              );
+                            },
+                            child: Icon(
+                              FluentIcons.arrow_upload_24_regular,
+                              size: 16,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // Clear All button
+                if (displayItems.length > 2)
+                  InkWell(
+                    onTap: () async {
+                      final confirm =
+                          await _showConfirmationDialog(context) ?? false;
+                      if (confirm) {
+                        searchHistoryNotifier.value = [];
+                        unawaited(
+                          addOrUpdateData<List>(
+                            'user',
+                            'searchHistory',
+                            [],
+                          ),
+                        );
+                      }
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            FluentIcons.delete_24_regular,
+                            size: 16,
+                            color: Color(0xFF8B5CF6),
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'Clear All',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF8B5CF6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ─── Mood & Genre Chips ───
+  Widget _buildMoodChips(ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SizedBox(
+        height: 42,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: _moodChips.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final chip = _moodChips[index];
+            return ActionChip(
+              label: Text(
+                chip['label']!,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              backgroundColor: colorScheme.surfaceContainerHigh,
+              side: BorderSide(
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              onPressed: () async {
+                await _submitSearch(chip['query'] ?? '');
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // ─── Smart Recommendations Section ───
+  Widget _buildRecommendations(Color primaryColor) {
+    if (_isLoadingRecommendations) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        child: Center(
+          child: Column(
+            children: [
+              const SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFF8B5CF6),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Loading recommendations...',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_recommendations.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionTitle(
+          'Recommended For You',
+          primaryColor,
+          icon: FluentIcons.star_24_filled,
+        ),
+        for (var index = 0; index < _recommendations.length; index++)
+          SongBar(
+            _recommendations[index],
+            true,
+            key: ValueKey('rec_song_$index'),
+            showMusicDuration: true,
+            borderRadius: getItemBorderRadius(index, _recommendations.length),
+          ),
+      ],
     );
   }
 

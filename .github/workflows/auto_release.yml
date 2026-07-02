@@ -51,7 +51,13 @@ jobs:
         with:
           tag_name: ${{ env.VERSION }}
           name: Release ${{ env.VERSION }}
-          body: "Automatic build from latest commit."
+          body: |
+            **Smart Search Page Update! 🚀**
+            
+            - **Google-style History:** Search history now appears dynamically when you tap the search bar, without blocking the whole screen!
+            - **Mood Chips:** Added 8 instant search chips right under the bar (`🎧 Workout`, `💔 Sad`, `🚗 Drive`, etc.).
+            - **Smart Algorithm:** App now prioritizes your frequent searches and most-listened songs.
+            - **Time-based Magic:** Suggests different music for Morning, Afternoon, Evening, and Night automatically!
           files: build/app/outputs/flutter-apk/app-github-release.apk
           prerelease: false
           make_latest: true
