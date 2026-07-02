@@ -61,7 +61,7 @@ flutter:
   assets:
     - assets/licenses/
     - assets/icons/musify_icon.png
-    - assets/app_logo.png
+    - assets/logo.png
 
   fonts:
     - family: paytoneOne

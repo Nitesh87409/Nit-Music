@@ -145,7 +145,7 @@ class _HomePageState extends State<HomePage> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         IconButton(
-          icon: Image.asset('assets/app_logo.png', width: 28, height: 28),
+          icon: Image.asset('assets/logo.png', width: 28, height: 28),
           onPressed: () {
             Scaffold.of(context).openDrawer();
           },
