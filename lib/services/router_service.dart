@@ -12,7 +12,6 @@ import 'package:musify/screens/playlist_folder_page.dart';
 import 'package:musify/screens/playlist_page.dart';
 import 'package:musify/screens/search_page.dart';
 import 'package:musify/screens/settings_page.dart';
-import 'package:musify/screens/splash_page.dart';
 import 'package:musify/screens/time_machine_page.dart';
 import 'package:musify/screens/generic_grid_page.dart';
 import 'package:musify/screens/user_songs_page.dart';
@@ -32,13 +31,6 @@ class NavigationManager {
 
   void _setupRouter() {
     final routes = [
-      GoRoute(
-        path: splashPath,
-        pageBuilder: (context, state) => getPage(
-          child: const SplashPage(),
-          state: state,
-        ),
-      ),
       StatefulShellRoute(
         parentNavigatorKey: parentNavigatorKey,
         branches: _getRouteBranches(),
@@ -57,12 +49,9 @@ class NavigationManager {
       ),
     ];
 
-    final hasSeenSplash =
-        Hive.box('settings').get('has_seen_splash', defaultValue: false) as bool;
-
     router = GoRouter(
       navigatorKey: parentNavigatorKey,
-      initialLocation: hasSeenSplash ? homePath : splashPath,
+      initialLocation: homePath,
       routes: routes,
       restorationScopeId: 'router',
       debugLogDiagnostics: kDebugMode,
@@ -124,7 +113,6 @@ class NavigationManager {
   GoRouteInformationParser get routeInformationParser =>
       router.routeInformationParser;
 
-  static const String splashPath = '/splash';
   static const String homePath = '/home';
   static const String timeMachinePath = '$homePath/timeMachine';
   static const String settingsPath = '/settings';
