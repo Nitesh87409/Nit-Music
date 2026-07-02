@@ -18,9 +18,9 @@ import 'package:path_provider/path_provider.dart';
 
 const String checkUrl = 'https://api.github.com/repos/Nitesh87409/Nit-Music/releases/latest';
 
-Future<void> checkAppUpdates() async {
-  // Prevent duplicate update checks in the same session
-  if (isUpdateChecked) return;
+Future<void> checkAppUpdates({bool manual = false}) async {
+  // Prevent duplicate update checks in the same session, unless manually triggered
+  if (isUpdateChecked && !manual) return;
   isUpdateChecked = true;
 
   try {

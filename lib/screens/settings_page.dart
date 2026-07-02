@@ -198,7 +198,7 @@ class SettingsPage extends StatelessWidget {
                         : BorderRadius.zero,
                     onTap: () {
                       if (kReleaseMode && !offlineMode.value) {
-                        checkAppUpdates();
+                        checkAppUpdates(manual: true);
                       }
                     },
                   ),
