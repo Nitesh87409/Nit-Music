@@ -65,21 +65,23 @@ class _PositionSliderState extends State<PositionSlider> {
     );
   }
 
-  static const _textStyle = TextStyle(fontSize: 12, color: Colors.grey);
-
   Widget _buildPositionRow(BuildContext context, PositionData positionData) {
     final positionText = formatDuration(
       _isDragging ? _dragValue.toInt() : positionData.position.inSeconds,
     );
     final durationText = formatDuration(positionData.duration.inSeconds);
+    final textStyle = TextStyle(
+      fontSize: 12,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 22),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(positionText, style: _textStyle),
-          Text(durationText, style: _textStyle),
+          Text(positionText, style: textStyle),
+          Text(durationText, style: textStyle),
         ],
       ),
     );

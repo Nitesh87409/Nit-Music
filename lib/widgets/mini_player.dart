@@ -9,6 +9,7 @@ import 'package:musify/models/position_data.dart';
 import 'package:musify/screens/now_playing_page.dart';
 import 'package:musify/widgets/marquee.dart';
 import 'package:musify/widgets/song_artwork.dart';
+import 'package:palette_generator/palette_generator.dart';
 import 'package:rxdart/rxdart.dart';
 
 final Stream<FullPlayerState> _fullPlayerStateStream =
@@ -109,6 +110,42 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
     _scaleAnimation = Tween<double>(begin: 1, end: 0.98).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
+    _updatePaletteIfNeeded();
+  }
+
+  Color? _dominantColor;
+  Color? _vibrantColor;
+
+  @override
+  void didUpdateWidget(covariant _MiniPlayerBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.metadata.id != oldWidget.metadata.id) {
+      _updatePaletteIfNeeded();
+    }
+  }
+
+  Future<void> _updatePaletteIfNeeded() async {
+    final item = widget.metadata;
+    if (item.artUri == null) return;
+    try {
+      final palette = await PaletteGenerator.fromImageProvider(
+        ResizeImage(
+          NetworkImage(item.artUri!.toString()),
+          width: 50,
+          height: 50,
+        ),
+        maximumColorCount: 3,
+        timeout: const Duration(seconds: 3),
+      );
+      if (mounted) {
+        setState(() {
+          _dominantColor = palette.dominantColor?.color;
+          _vibrantColor = palette.vibrantColor?.color ?? palette.dominantColor?.color;
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 
   @override
@@ -135,24 +172,37 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
       transitionDuration: const Duration(milliseconds: 400),
       reverseTransitionDuration: const Duration(milliseconds: 350),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        final fadeAnimation = Tween<double>(
-          begin: 0.0,
-          end: 1.0,
+        final slideAnimation = Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
         ).animate(CurvedAnimation(
           parent: animation,
           curve: Curves.easeOutCubic,
           reverseCurve: Curves.easeInCubic,
         ));
-        return FadeTransition(opacity: fadeAnimation, child: child);
+        return SlideTransition(position: slideAnimation, child: child);
       },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = widget.colorScheme;
+    final defaultColorScheme = widget.colorScheme;
     final metadata = widget.metadata;
     final state = widget.state;
+
+    final backgroundColor = _vibrantColor ?? _dominantColor ?? defaultColorScheme.surfaceContainerHighest;
+    final isDark = ThemeData.estimateBrightnessForColor(backgroundColor) == Brightness.dark;
+    
+    final colorScheme = defaultColorScheme.copyWith(
+      secondary: isDark ? Colors.white : Colors.black87,
+      onSurfaceVariant: isDark ? Colors.white70 : Colors.black54,
+      onSurface: isDark ? Colors.white : Colors.black87,
+      primary: isDark ? const Color(0xFFB490FF) : const Color(0xFF7C3AED),
+      surfaceContainerHighest: isDark ? Colors.white24 : Colors.black12,
+      outlineVariant: isDark ? Colors.white24 : Colors.black12,
+      shadow: isDark ? Colors.black : Colors.transparent,
+    );
 
     final totalDuration = state.position.duration > Duration.zero
         ? state.position.duration
@@ -178,17 +228,16 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
               height: MiniPlayer.playerHeight,
               child: Stack(
                 children: [
-                  Hero(
-                    tag: 'player_background',
-                    child: ClipRRect(
+                  // Removed player_background Hero to avoid snapping
+                  ClipRRect(
                       borderRadius: BorderRadius.circular(MiniPlayer._borderRadius),
                       child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                         child: Container(
                           height: MiniPlayer.playerHeight,
                           decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest.withValues(
-                              alpha: 0.95,
+                            color: (_vibrantColor ?? _dominantColor ?? colorScheme.surfaceContainerHighest).withValues(
+                              alpha: 0.85,
                             ),
                             borderRadius: BorderRadius.circular(
                               MiniPlayer._borderRadius,
@@ -208,7 +257,6 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
                           ),
                         ),
                       ),
-                    ),
                   ),
                   Positioned(
                     top: 12,
@@ -301,11 +349,14 @@ class _ArtworkWidget extends StatelessWidget {
               ),
             ],
           ),
-          child: SongArtworkWidget(
-            metadata: metadata,
-            size: MiniPlayer._artworkSize,
-            errorWidgetIconSize: 24,
-            borderRadius: MiniPlayer._artworkRadius,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(MiniPlayer._artworkRadius),
+            child: SongArtworkWidget(
+              metadata: metadata,
+              size: MiniPlayer._artworkSize,
+              errorWidgetIconSize: 24,
+              borderRadius: MiniPlayer._artworkRadius,
+            ),
           ),
         ),
       ),

@@ -79,21 +79,18 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: Hero(
-              tag: 'player_background',
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 600),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      _vibrantColor?.withValues(alpha: 0.6) ?? colorScheme.surface,
-                      _dominantColor?.withValues(alpha: 0.8) ?? colorScheme.surface,
-                      colorScheme.surface,
-                    ],
-                    stops: const [0.0, 0.4, 1.0],
-                  ),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 600),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    _vibrantColor?.withValues(alpha: 0.6) ?? colorScheme.surface,
+                    _dominantColor?.withValues(alpha: 0.8) ?? colorScheme.surface,
+                    colorScheme.surface,
+                  ],
+                  stops: const [0.0, 0.4, 1.0],
                 ),
               ),
             ),
@@ -107,38 +104,51 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   final metadata = snapshot.data!;
-                  return GestureDetector(
-                    onVerticalDragEnd: (details) {
-                      if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
-                        Navigator.pop(context);
-                      }
-                    },
-                    child: Column(
-                      children: [
-                        _buildAppBar(context, colorScheme),
-                        Expanded(
-                          child: isLargeScreen
-                              ? _DesktopLayout(
-                                  metadata: metadata,
-                                  size: size,
-                                  adjustedIconSize: baseIconSize,
-                                  adjustedMiniIconSize: miniIconSize,
-                                  lyricsController: _lyricsController,
-                                  dominantColor: _dominantColor,
-                                )
-                              : _MobileLayout(
-                                  metadata: metadata,
-                                  size: size,
-                                  adjustedIconSize: baseIconSize,
-                                  adjustedMiniIconSize: miniIconSize,
-                                  isLargeScreen: isLargeScreen,
-                                  lyricsController: _lyricsController,
-                                  dominantColor: _dominantColor,
-                                ),
+                    final backgroundColor = _vibrantColor ?? _dominantColor ?? colorScheme.surface;
+                    final isDark = ThemeData.estimateBrightnessForColor(backgroundColor) == Brightness.dark;
+                    
+                    final dynamicColorScheme = colorScheme.copyWith(
+                      onSurface: isDark ? Colors.white : Colors.black87,
+                      onSurfaceVariant: isDark ? Colors.white70 : Colors.black54,
+                      primary: isDark ? const Color(0xFFB490FF) : const Color(0xFF7C3AED),
+                      surfaceContainerHighest: isDark ? Colors.white24 : Colors.black12,
+                    );
+
+                    return GestureDetector(
+                      onVerticalDragEnd: (details) {
+                        if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
+                          Navigator.pop(context);
+                        }
+                      },
+                      child: Theme(
+                        data: theme.copyWith(colorScheme: dynamicColorScheme),
+                        child: Column(
+                          children: [
+                            _buildAppBar(context, dynamicColorScheme),
+                            Expanded(
+                              child: isLargeScreen
+                                  ? _DesktopLayout(
+                                      metadata: metadata,
+                                      size: size,
+                                      adjustedIconSize: baseIconSize,
+                                      adjustedMiniIconSize: miniIconSize,
+                                      lyricsController: _lyricsController,
+                                      dominantColor: _dominantColor,
+                                    )
+                                  : _MobileLayout(
+                                      metadata: metadata,
+                                      size: size,
+                                      adjustedIconSize: baseIconSize,
+                                      adjustedMiniIconSize: miniIconSize,
+                                      isLargeScreen: isLargeScreen,
+                                      lyricsController: _lyricsController,
+                                      dominantColor: _dominantColor,
+                                    ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  );
+                      ),
+                    );
                 },
               ),
             ),
