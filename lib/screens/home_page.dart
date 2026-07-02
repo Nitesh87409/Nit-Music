@@ -477,13 +477,13 @@ class _HomePageState extends State<HomePage> {
                         );
                       },
                       child: SizedBox(
-                        width: 140,
+                        width: 220,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              width: 140,
-                              height: 140,
+                              width: 220,
+                              height: 124,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(16),
                                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
