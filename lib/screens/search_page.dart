@@ -69,7 +69,9 @@ class _SearchPageState extends State<SearchPage> {
   List<dynamic> _playlistsSearchResult = [];
   List<String> _suggestionsList = [];
   Timer? _debounce;
+  Timer? _liveSearchDebounce;
   int _latestSuggestionRequest = 0;
+  int _latestLiveSearchRequest = 0;
 
   // Smart recommendations
   List<dynamic> _recommendations = [];
@@ -135,10 +137,11 @@ class _SearchPageState extends State<SearchPage> {
     _inputNode.dispose();
     _fetchingSongs.dispose();
     _debounce?.cancel();
+    _liveSearchDebounce?.cancel();
     super.dispose();
   }
 
-  Future<void> search() async {
+  Future<void> search({int? requestId}) async {
     final query = _searchBar.text;
 
     if (query.isEmpty) {
@@ -168,6 +171,10 @@ class _SearchPageState extends State<SearchPage> {
         getPlaylists(query: query, type: 'album').timeout(const Duration(seconds: 2), onTimeout: () => []),
         getPlaylists(query: query, type: 'playlist').timeout(const Duration(seconds: 2), onTimeout: () => []),
       ]);
+
+      if (requestId != null && requestId != _latestLiveSearchRequest) {
+        return; // Ignore results if a newer request was made
+      }
 
       _songsSearchResult = results[0];
       _artistsSearchResult = results[1]
@@ -314,21 +321,43 @@ class _SearchPageState extends State<SearchPage> {
 
   // ─── Suggestions List (while typing) ───
   Widget _buildSuggestionsList(ColorScheme colorScheme) {
+    final currentText = _searchBar.text.toLowerCase();
+    
     return Column(
-      key: ValueKey('suggestions-${_suggestionsList.length}-${_searchBar.text}'),
+      key: ValueKey('suggestions-${_suggestionsList.length}-$currentText'),
       children: [
         for (int index = 0; index < _suggestionsList.length; index++)
           Builder(
             builder: (context) {
               final query = _suggestionsList[index];
-              final borderRadius = getItemBorderRadius(
-                index,
-                _suggestionsList.length,
-              );
-              return CustomBar(
-                query,
-                FluentIcons.search_24_regular,
-                borderRadius: borderRadius,
+              final queryLower = query.toLowerCase();
+              
+              Widget titleWidget;
+              if (queryLower.startsWith(currentText) && currentText.isNotEmpty) {
+                final remaining = query.substring(currentText.length);
+                titleWidget = RichText(
+                  text: TextSpan(
+                    text: query.substring(0, currentText.length),
+                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16),
+                    children: [
+                      TextSpan(
+                        text: remaining,
+                        style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                titleWidget = Text(query, style: TextStyle(color: colorScheme.onSurface, fontSize: 16));
+              }
+
+              return ListTile(
+                leading: Icon(FluentIcons.search_24_regular, color: colorScheme.onSurfaceVariant, size: 22),
+                title: titleWidget,
+                trailing: Icon(FluentIcons.arrow_up_left_24_regular, color: colorScheme.onSurfaceVariant, size: 22),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
+                dense: true,
                 onTap: () async {
                   await _submitSearch(query);
                 },
