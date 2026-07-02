@@ -59,6 +59,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
   );
   bool playlistOfflineStatus = false;
   bool _isInitializingPlaylist = true;
+  bool _isLoadingMoreArtistSongs = false;
 
   String? get _resolvedPlaylistId =>
       _playlist?['ytid']?.toString() ??
@@ -171,6 +172,52 @@ class _PlaylistPageState extends State<PlaylistPage> {
     }
   }
 
+  Future<void> _loadMoreArtistSongs() async {
+    final unfetchedReleases = _playlist['unfetchedReleases'] as List<dynamic>? ?? [];
+    if (unfetchedReleases.isEmpty || _isLoadingMoreArtistSongs) return;
+
+    setState(() {
+      _isLoadingMoreArtistSongs = true;
+    });
+
+    final artistId = _playlist['ytid']?.toString() ?? '';
+    final artistName = _playlist['title']?.toString() ?? '';
+
+    final result = await loadMoreArtistSongs(unfetchedReleases, artistId, artistName);
+    
+    if (mounted) {
+      setState(() {
+        final newSongs = result['songs'] as List<dynamic>;
+        final list = _playlist['list'] as List<dynamic>;
+        list.addAll(newSongs);
+        
+        _originalPlaylistList = List<dynamic>.from(list);
+        _playlist['unfetchedReleases'] = result['unfetchedReleases'];
+        
+        if ((result['unfetchedReleases'] as List).isEmpty) {
+          _playlist['isCatalogComplete'] = true;
+        }
+
+        _sortPlaylist(_sortType);
+        _isLoadingMoreArtistSongs = false;
+      });
+    }
+  }
+
+  Widget _buildLoadMoreButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Center(
+        child: _isLoadingMoreArtistSongs
+            ? const Spinner()
+            : FilledButton.tonal(
+                onPressed: _loadMoreArtistSongs,
+                child: const Text('Load More'),
+              ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -198,11 +245,19 @@ class _PlaylistPageState extends State<PlaylistPage> {
                       valueListenable: _searchQueryNotifier,
                       builder: (context, searchQuery, _) {
                         final sourceList = _getSourceList(searchQuery);
+                        final showLoadMore = widget.isArtist && 
+                           (_playlist['unfetchedReleases'] as List<dynamic>? ?? []).isNotEmpty && 
+                           searchQuery.isEmpty;
+                           
                         return SliverPadding(
                           padding: commonListViewBottomPadding,
                           sliver: SliverList.builder(
-                            itemCount: sourceList.length,
+                            itemCount: sourceList.length + (showLoadMore ? 1 : 0),
                             itemBuilder: (context, index) {
+                              if (showLoadMore && index == sourceList.length) {
+                                return _buildLoadMoreButton();
+                              }
+                              
                               final isRemovable =
                                   _playlist['source'] == 'user-created';
                               return _buildSongListItem(

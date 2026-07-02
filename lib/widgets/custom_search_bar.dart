@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 
@@ -28,25 +29,43 @@ class _CustomSearchBarState extends State<CustomSearchBar> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: SearchBar(
-        elevation: WidgetStateProperty.all(0),
-        shadowColor: WidgetStateProperty.all(Colors.transparent),
-        backgroundColor: WidgetStateProperty.all(
-          colorScheme.surfaceContainerHighest,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(50),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-        side: WidgetStateProperty.all(
-          BorderSide(color: colorScheme.outlineVariant),
-        ),
-        overlayColor: WidgetStateProperty.all(
-          const Color(0xFF8B5CF6).withOpacity(0.08),
-        ),
-        shape: WidgetStateProperty.all(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-        ),
-        padding: WidgetStateProperty.all(
-          const EdgeInsets.symmetric(horizontal: 16),
-        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(50),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: SearchBar(
+              elevation: WidgetStateProperty.all(0),
+              shadowColor: WidgetStateProperty.all(Colors.transparent),
+              backgroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.focused)) {
+                  return colorScheme.surfaceContainerHighest.withValues(alpha: 0.85);
+                }
+                return colorScheme.surfaceContainerHighest.withValues(alpha: 0.65);
+              }),
+              side: WidgetStateProperty.all(
+                BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+              ),
+              overlayColor: WidgetStateProperty.all(
+                const Color(0xFF8B5CF6).withValues(alpha: 0.08),
+              ),
+              shape: WidgetStateProperty.all(
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+              ),
+              padding: WidgetStateProperty.all(
+                const EdgeInsets.symmetric(horizontal: 16),
+              ),
         hintText: widget.labelText,
         hintStyle: WidgetStateProperty.all(
           TextStyle(
@@ -115,6 +134,9 @@ class _CustomSearchBarState extends State<CustomSearchBar> {
               },
             ),
         ],
+      ),
+          ),
+        ),
       ),
     );
   }

@@ -57,14 +57,14 @@ class CustomBar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      tileName,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                        color: textColor ?? colorScheme.onSurface,
+                      Text(
+                        tileName,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                          color: textColor ?? colorScheme.onSurface,
+                        ),
                       ),
-                    ),
                     if (description != null) ...[
                       const SizedBox(height: 2),
                       Text(

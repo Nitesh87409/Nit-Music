@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:musify/extensions/l10n.dart';
 import 'package:musify/widgets/custom_search_bar.dart';
 
 class SearchBarSection extends StatefulWidget {
@@ -24,7 +25,7 @@ class _SearchBarSectionState extends State<SearchBarSection> {
     return CustomSearchBar(
       controller: widget.controller,
       focusNode: widget.focusNode,
-      labelText: widget.labelText,
+      labelText: context.l10n!.search,
       onSubmitted: (_) {},
       onChanged: widget.onSearchChanged,
     );

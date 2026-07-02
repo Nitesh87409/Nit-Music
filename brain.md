@@ -16,4 +16,15 @@ This file keeps track of all the changes and updates made to this personal music
 - **APK Generation:** Created and placed the final `NitMusic.apk` in the root directory for easy access.
 - **UI Clean-up:** Completely removed the 'Licenses' and 'Translate' options from the Settings page to ensure no old UI elements or external links to the original developer exist.
 - **UI Modernization:** Redesigned the mini player into a floating glassmorphism pill, rounded the search bar, added a SliverAppBar with gradient to the home screen, and updated the main headings to 'Nit Music'.
+- **UI Clean-up:** Completely removed the 'Licenses' and 'Translate' options from the Settings page to ensure no old UI elements or external links to the original developer exist.
+- **UI Modernization:** Redesigned the mini player into a floating glassmorphism pill, rounded the search bar, added a SliverAppBar with gradient to the home screen, and updated the main headings to 'Nit Music'.
 - **Auto Updates setup:** Initialized Git and added GitHub action (.github/workflows/auto_release.yml) to automatically compile APK and push to Github Releases. Updated update_manager.dart to fetch OTA updates directly from GitHub API.
+
+**Date: July 2, 2026**
+- **True Listening History:** Fixed the audio player queue logic in  udio_service.dart so that starting a new song/playlist accurately saves the currently playing song to history. Tapping the "Previous" button now perfectly restores the previously playing song.
+- **Generic Grid & See All:** Implemented a new GenericGridPage and updated outer_service.dart so the "See all" buttons on the Home Page (for Top Mixes, Recommended) now properly route to a full grid view.
+- **Premium Bottom Navigation:** Rebuilt the bottom navigation to feature a sliding pill indicator with FastOutSlowIn easing. The icons, labels, and page transitions are now 100% perfectly synchronized, replicating the feel of YouTube Music.
+- **Settings UI & Navigation Fixes:** Overhauled the Settings section by replacing persistent sheets with showModalBottomSheet. This fixed the broken back-button/orphaned overlay issues. Slightly reduced and refined typography across all settings for a cleaner, modern look.
+- **Splash Screen Polish:** Refined the initial launch splash screen animation to use a premium, snappy `elasticOut` curve, and ensured it accurately reads the `has_seen_splash` flag so it only shows up on the first app launch.
+- **Search UI Refinement:** Restored the text labels to the `CustomBottomNavigationBar` after a previous mistake, and verified that the large purple "Search" text issue reported on older APK versions was indeed already removed from the codebase.
+- **Home Page Dynamic Header:** Replaced the hamburger menu icon on the Home page top bar with the official `Nit Music` app logo icon. Additionally, updated the "Music" text color to dynamically extract and match the vibrant color of the currently playing song's artwork, synchronizing with the Now Playing background.

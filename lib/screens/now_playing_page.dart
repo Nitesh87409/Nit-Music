@@ -8,6 +8,9 @@ import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
 import 'package:musify/widgets/queue_list_view.dart';
 
+import 'dart:async';
+import 'package:palette_generator/palette_generator.dart';
+
 class NowPlayingPage extends StatefulWidget {
   const NowPlayingPage({super.key});
 
@@ -17,7 +20,41 @@ class NowPlayingPage extends StatefulWidget {
 
 class _NowPlayingPageState extends State<NowPlayingPage> {
   final _lyricsController = FlipCardController();
+  StreamSubscription? _mediaItemSub;
+  Color? _dominantColor;
+  Color? _vibrantColor;
 
+  @override
+  void initState() {
+    super.initState();
+    _mediaItemSub = audioHandler.mediaItem.listen((item) {
+      _updatePalette(item);
+    });
+  }
+
+  @override
+  void dispose() {
+    _mediaItemSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _updatePalette(MediaItem? item) async {
+    if (item?.artUri == null) return;
+    try {
+      final palette = await PaletteGenerator.fromImageProvider(
+        NetworkImage(item!.artUri!.toString()),
+        maximumColorCount: 5,
+      );
+      if (mounted) {
+        setState(() {
+          _dominantColor = palette.dominantColor?.color;
+          _vibrantColor = palette.vibrantColor?.color ?? palette.dominantColor?.color;
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
@@ -33,47 +70,73 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     final miniIconSize = screenWidth < 360 ? 18.0 : 22.0;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: SafeArea(
-        child: StreamBuilder<MediaItem?>(
-          stream: audioHandler.mediaItem,
-          builder: (context, snapshot) {
-            if (snapshot.data == null || !snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final metadata = snapshot.data!;
-            return GestureDetector(
-              onVerticalDragEnd: (details) {
-                if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
-                  Navigator.pop(context);
-                }
-              },
-              child: Column(
-                children: [
-                  _buildAppBar(context, colorScheme),
-                  Expanded(
-                    child: isLargeScreen
-                        ? _DesktopLayout(
-                            metadata: metadata,
-                            size: size,
-                            adjustedIconSize: baseIconSize,
-                            adjustedMiniIconSize: miniIconSize,
-                            lyricsController: _lyricsController,
-                          )
-                        : _MobileLayout(
-                            metadata: metadata,
-                            size: size,
-                            adjustedIconSize: baseIconSize,
-                            adjustedMiniIconSize: miniIconSize,
-                            isLargeScreen: isLargeScreen,
-                            lyricsController: _lyricsController,
-                          ),
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Hero(
+              tag: 'player_background',
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 600),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      _vibrantColor?.withValues(alpha: 0.6) ?? colorScheme.surface,
+                      _dominantColor?.withValues(alpha: 0.8) ?? colorScheme.surface,
+                      colorScheme.surface,
+                    ],
+                    stops: const [0.0, 0.4, 1.0],
                   ),
-                ],
+                ),
               ),
-            );
-          },
-        ),
+            ),
+          ),
+          Positioned.fill(
+            child: SafeArea(
+              child: StreamBuilder<MediaItem?>(
+                stream: audioHandler.mediaItem,
+                builder: (context, snapshot) {
+                  if (snapshot.data == null || !snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final metadata = snapshot.data!;
+                  return GestureDetector(
+                    onVerticalDragEnd: (details) {
+                      if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
+                        Navigator.pop(context);
+                      }
+                    },
+                    child: Column(
+                      children: [
+                        _buildAppBar(context, colorScheme),
+                        Expanded(
+                          child: isLargeScreen
+                              ? _DesktopLayout(
+                                  metadata: metadata,
+                                  size: size,
+                                  adjustedIconSize: baseIconSize,
+                                  adjustedMiniIconSize: miniIconSize,
+                                  lyricsController: _lyricsController,
+                                )
+                              : _MobileLayout(
+                                  metadata: metadata,
+                                  size: size,
+                                  adjustedIconSize: baseIconSize,
+                                  adjustedMiniIconSize: miniIconSize,
+                                  isLargeScreen: isLargeScreen,
+                                  lyricsController: _lyricsController,
+                                ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -12,10 +12,13 @@ import 'package:musify/screens/playlist_folder_page.dart';
 import 'package:musify/screens/playlist_page.dart';
 import 'package:musify/screens/search_page.dart';
 import 'package:musify/screens/settings_page.dart';
+import 'package:musify/screens/splash_page.dart';
 import 'package:musify/screens/time_machine_page.dart';
+import 'package:musify/screens/generic_grid_page.dart';
 import 'package:musify/screens/user_songs_page.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:musify/widgets/offline_search_placeholder.dart';
 
 class NavigationManager {
@@ -29,21 +32,37 @@ class NavigationManager {
 
   void _setupRouter() {
     final routes = [
-      StatefulShellRoute.indexedStack(
+      GoRoute(
+        path: splashPath,
+        pageBuilder: (context, state) => getPage(
+          child: const SplashPage(),
+          state: state,
+        ),
+      ),
+      StatefulShellRoute(
         parentNavigatorKey: parentNavigatorKey,
         branches: _getRouteBranches(),
+        navigatorContainerBuilder: (context, navigationShell, children) {
+          return BottomNavigationPage(
+            navigationShell: navigationShell,
+            children: children,
+          );
+        },
         pageBuilder: (context, state, navigationShell) {
           return getPage(
-            child: BottomNavigationPage(child: navigationShell),
+            child: navigationShell,
             state: state,
           );
         },
       ),
     ];
 
+    final hasSeenSplash =
+        Hive.box('settings').get('has_seen_splash', defaultValue: false) as bool;
+
     router = GoRouter(
       navigatorKey: parentNavigatorKey,
-      initialLocation: homePath,
+      initialLocation: hasSeenSplash ? homePath : splashPath,
       routes: routes,
       restorationScopeId: 'router',
       debugLogDiagnostics: kDebugMode,
@@ -105,6 +124,7 @@ class NavigationManager {
   GoRouteInformationParser get routeInformationParser =>
       router.routeInformationParser;
 
+  static const String splashPath = '/splash';
   static const String homePath = '/home';
   static const String timeMachinePath = '$homePath/timeMachine';
   static const String settingsPath = '/settings';
@@ -158,6 +178,28 @@ class NavigationManager {
                   ),
                   state: state,
                 ),
+              ),
+              GoRoute(
+                path: 'playlist_data',
+                pageBuilder: (context, state) => _pushPage(
+                  child: PlaylistPage(
+                    playlistData: _extraAsMap(state.extra),
+                  ),
+                  state: state,
+                ),
+              ),
+              GoRoute(
+                path: 'generic_grid',
+                pageBuilder: (context, state) {
+                  final extra = _extraAsMap(state.extra);
+                  return _pushPage(
+                    child: GenericGridPage(
+                      title: extra?['title'] ?? '',
+                      items: extra?['items'] ?? [],
+                    ),
+                    state: state,
+                  );
+                },
               ),
               GoRoute(
                 path: 'artist/:artistId',

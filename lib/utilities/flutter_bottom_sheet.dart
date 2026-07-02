@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:musify/services/router_service.dart';
 
-PersistentBottomSheetController? _currentBottomSheetController;
+bool _isBottomSheetOpen = false;
 
-PersistentBottomSheetController? showCustomBottomSheet(
+Future<void> showCustomBottomSheet(
   BuildContext context,
   Widget content,
-) {
+) async {
+  if (_isBottomSheetOpen) return;
+  _isBottomSheetOpen = true;
+
   final size = MediaQuery.sizeOf(context);
   final colorScheme = Theme.of(context).colorScheme;
 
-  final controller = showBottomSheet(
-    enableDrag: true,
+  await showModalBottomSheet(
     context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    elevation: 0,
     builder: (context) => Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
@@ -53,19 +60,17 @@ PersistentBottomSheetController? showCustomBottomSheet(
     ),
   );
 
-  _currentBottomSheetController = controller;
-  controller.closed.whenComplete(() {
-    if (_currentBottomSheetController == controller) {
-      _currentBottomSheetController = null;
-    }
-  });
-
-  return controller;
+  _isBottomSheetOpen = false;
 }
 
 void closeCurrentBottomSheet() {
-  try {
-    _currentBottomSheetController?.close();
-  } catch (_) {}
-  _currentBottomSheetController = null;
+  if (_isBottomSheetOpen) {
+    try {
+      final context = NavigationManager.parentNavigatorKey.currentContext;
+      if (context != null) {
+        Navigator.pop(context);
+      }
+    } catch (_) {}
+    _isBottomSheetOpen = false;
+  }
 }

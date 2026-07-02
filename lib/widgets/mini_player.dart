@@ -132,13 +132,15 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
   PageRoute<void> _createSlideTransition() {
     return PageRouteBuilder<void>(
       pageBuilder: (context, animation, _) => const NowPlayingPage(),
-      reverseTransitionDuration: const Duration(milliseconds: 250),
+      transitionDuration: const Duration(milliseconds: 400),
+      reverseTransitionDuration: const Duration(milliseconds: 350),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        final tween = Tween(
-          begin: const Offset(0, 1),
-          end: Offset.zero,
-        ).chain(CurveTween(curve: Curves.easeInOut));
-        return SlideTransition(position: animation.drive(tween), child: child);
+        final fadeAnimation = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(opacity: fadeAnimation, child: child);
       },
     );
   }
@@ -169,76 +171,89 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
             onTapCancel: () => _animationController.reverse(),
             onVerticalDragUpdate: _handleVerticalDrag,
             onTap: _navigateToNowPlaying,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(MiniPlayer._borderRadius),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                child: Container(
-                  height: MiniPlayer.playerHeight,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF181534).withValues(
-                      alpha: 0.95,
-                    ),
-                    borderRadius: BorderRadius.circular(
-                      MiniPlayer._borderRadius,
-                    ),
-                    border: Border.all(
-                      color: const Color(0xFFA67CFF).withValues(alpha: 0.3),
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
-                        blurRadius: 16,
-                        spreadRadius: 1,
-                        offset: const Offset(0, 2),
+            child: SizedBox(
+              height: MiniPlayer.playerHeight,
+              child: Stack(
+                children: [
+                  Hero(
+                    tag: 'player_background',
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(MiniPlayer._borderRadius),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        child: Container(
+                          height: MiniPlayer.playerHeight,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF181534).withValues(
+                              alpha: 0.95,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              MiniPlayer._borderRadius,
+                            ),
+                            border: Border.all(
+                              color: const Color(0xFFA67CFF).withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                                blurRadius: 16,
+                                spreadRadius: 1,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ],
+                    ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Row(
-                      children: [
-                        _ArtworkWidget(metadata: metadata),
-                        Expanded(
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            switchInCurve: Curves.easeIn,
-                            switchOutCurve: Curves.easeOut,
-                            layoutBuilder: (currentChild, previousChildren) =>
-                                Stack(
-                                  alignment: Alignment.centerLeft,
-                                  children: [
-                                    ...previousChildren,
-                                    if (currentChild != null) currentChild,
-                                  ],
+                  Align(
+                    alignment: Alignment.center,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Row(
+                        children: [
+                          _ArtworkWidget(metadata: metadata),
+                          Expanded(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              switchInCurve: Curves.easeIn,
+                              switchOutCurve: Curves.easeOut,
+                              layoutBuilder: (currentChild, previousChildren) =>
+                                  Stack(
+                                    alignment: Alignment.centerLeft,
+                                    children: [
+                                      ...previousChildren,
+                                      if (currentChild != null) currentChild,
+                                    ],
+                                  ),
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  ),
+                              child: KeyedSubtree(
+                                key: ValueKey(metadata.id),
+                                child: _MetadataWidget(
+                                  title: metadata.title,
+                                  artist: metadata.artist,
+                                  colorScheme: colorScheme,
                                 ),
-                            transitionBuilder: (child, animation) =>
-                                FadeTransition(
-                                  opacity: animation,
-                                  child: child,
-                                ),
-                            child: KeyedSubtree(
-                              key: ValueKey(metadata.id),
-                              child: _MetadataWidget(
-                                title: metadata.title,
-                                artist: metadata.artist,
-                                colorScheme: colorScheme,
                               ),
                             ),
                           ),
-                        ),
-                        _ControlsWidget(
-                          colorScheme: colorScheme,
-                          playbackState: state.playbackState,
-                          hasPrevious: widget.hasPrevious,
-                          hasNext: widget.hasNext,
-                          progress: progress,
-                        ),
-                      ],
+                          _ControlsWidget(
+                            colorScheme: colorScheme,
+                            playbackState: state.playbackState,
+                            hasPrevious: widget.hasPrevious,
+                            hasNext: widget.hasNext,
+                            progress: progress,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
           ),

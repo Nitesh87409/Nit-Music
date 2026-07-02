@@ -1,0 +1,1 @@
+import 'package:youtube_explode_dart/youtube_explode_dart.dart'; void main() async { final yt = YoutubeExplode(); final res = await yt.search.search('test'); print(res.length); final next = await res.nextPage(); print(next?.length); yt.close(); }

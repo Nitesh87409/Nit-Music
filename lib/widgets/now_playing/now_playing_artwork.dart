@@ -7,6 +7,7 @@ import 'package:musify/services/common_services.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/async_loader.dart';
 import 'package:musify/widgets/song_artwork.dart';
+import 'package:musify/widgets/synced_lyrics_widget.dart';
 import 'package:musify/main.dart';
 
 class NowPlayingArtwork extends StatelessWidget {
@@ -53,28 +54,31 @@ class NowPlayingArtwork extends StatelessWidget {
         rotateSide: RotateSide.right,
         onTapFlipping: !offlineMode.value,
         controller: lyricsController,
-        frontWidget: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(borderRadius),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
-              blurRadius: 40,
-              offset: const Offset(0, 4),
-              spreadRadius: 4,
+        frontWidget: Hero(
+          tag: 'now_playing_artwork',
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(borderRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                  blurRadius: 40,
+                  offset: const Offset(0, 4),
+                  spreadRadius: 4,
+                ),
+              ],
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(borderRadius),
-          child: SongArtworkWidget(
-            metadata: metadata,
-            size: imageSize,
-            errorWidgetIconSize: size.width / 8,
-            borderRadius: borderRadius,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(borderRadius),
+              child: SongArtworkWidget(
+                metadata: metadata,
+                size: imageSize,
+                errorWidgetIconSize: size.width / 8,
+                borderRadius: borderRadius,
+              ),
+            ),
           ),
         ),
-      ),
       backWidget: Container(
         width: imageSize,
         height: imageSize,
@@ -90,71 +94,17 @@ class NowPlayingArtwork extends StatelessWidget {
             ),
           ],
         ),
-        child: AsyncLoader<String?>(
-          future: getSongLyrics(metadata.artist, metadata.title),
-          emptyWidget: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  FluentIcons.text_quote_24_regular,
-                  size: 48,
-                  color: colorScheme.onSecondaryContainer.withValues(
-                    alpha: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  context.l10n!.lyricsNotAvailable,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    color: colorScheme.onSecondaryContainer,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-          errorBuilder: (ctx, error, stack) => Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  FluentIcons.text_quote_24_regular,
-                  size: 48,
-                  color: colorScheme.onSecondaryContainer.withValues(
-                    alpha: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  context.l10n!.lyricsNotAvailable,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    color: colorScheme.onSecondaryContainer,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-          builder: (context, lyrics) => SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            physics: const BouncingScrollPhysics(),
-            child: Text(
-              lyrics ?? context.l10n!.lyricsNotAvailable,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                color: colorScheme.onSecondaryContainer,
-                height: 1.6,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          ),
+        child: SyncedLyricsWidget(
+          positionDataStream: audioHandler.positionDataStream,
+          trackName: metadata.title,
+          artistName: metadata.artist,
+          duration: metadata.duration,
+          width: imageSize,
+          height: imageSize,
+          onSeek: (position) {
+            audioHandler.seek(position);
+          },
+        ),
         ),
       ),
     );

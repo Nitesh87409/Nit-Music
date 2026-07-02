@@ -52,12 +52,13 @@ jobs:
           tag_name: ${{ env.VERSION }}
           name: Release ${{ env.VERSION }}
           body: |
-            **Smart Search Page Update! 🚀**
+            **Nit Music Premium Update! 🚀**
             
-            - **Google-style History:** Search history now appears dynamically when you tap the search bar, without blocking the whole screen!
-            - **Mood Chips:** Added 8 instant search chips right under the bar (`🎧 Workout`, `💔 Sad`, `🚗 Drive`, etc.).
-            - **Smart Algorithm:** App now prioritizes your frequent searches and most-listened songs.
-            - **Time-based Magic:** Suggests different music for Morning, Afternoon, Evening, and Night automatically!
+            - 🎨 **Dynamic Header:** App logo with dynamic song color matching!
+            - 💎 **Premium Navigation:** Liquid spring animations for bottom navigation!
+            - ✨ **Splash Screen:** Polished elastic launch animation!
+            - ⚙️ **Settings & Grids:** Overhauled settings UI and added Generic Grid for 'See All' pages.
+            - 🎵 **True Listening History:** Fixed queue logic to accurately track played songs.
           files: build/app/outputs/flutter-apk/app-github-release.apk
           prerelease: false
           make_latest: true

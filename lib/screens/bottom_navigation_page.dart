@@ -12,15 +12,20 @@ import 'package:musify/utilities/flutter_bottom_sheet.dart'
 import 'package:musify/widgets/mini_player.dart';
 
 class BottomNavigationPage extends StatefulWidget {
-  const BottomNavigationPage({required this.child, super.key});
+  const BottomNavigationPage({
+    required this.navigationShell,
+    required this.children,
+    super.key,
+  });
 
-  final StatefulNavigationShell child;
+  final StatefulNavigationShell navigationShell;
+  final List<Widget> children;
 
   @override
   State<BottomNavigationPage> createState() => _BottomNavigationPageState();
 }
 
-class _BottomNavigationPageState extends State<BottomNavigationPage> {
+class _BottomNavigationPageState extends State<BottomNavigationPage> with TickerProviderStateMixin {
   late final _miniPlayerVisibilityStream = audioHandler.mediaItem
       .map((mediaItem) => mediaItem != null)
       .distinct();
@@ -30,16 +35,51 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
   /// Track the previously selected tab index to detect double-taps on the same tab.
   int? _previousTabIndex;
 
+  late final AnimationController _animationController;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+      value: widget.navigationShell.currentIndex.toDouble(),
+    );
+    _animation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.fastOutSlowIn,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant BottomNavigationPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.navigationShell.currentIndex != oldWidget.navigationShell.currentIndex) {
+      _animationController.animateTo(
+        widget.navigationShell.currentIndex.toDouble(),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.fastOutSlowIn,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: widget.child.currentIndex == 0,
+      canPop: widget.navigationShell.currentIndex == 0,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
 
-        final currentIndex = widget.child.currentIndex;
+        final currentIndex = widget.navigationShell.currentIndex;
         if (currentIndex != 0) {
-          widget.child.goBranch(0);
+          widget.navigationShell.goBranch(0);
         } else {
           SystemNavigator.pop();
         }
@@ -101,7 +141,28 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                                       bottom: bottomPadding,
                                     ),
                                   ),
-                                  child: widget.child,
+                                  child: AnimatedBuilder(
+                                    animation: _animation,
+                                    builder: (context, child) {
+                                      return Stack(
+                                        children: List.generate(widget.children.length, (index) {
+                                          final distance = (_animation.value - index).abs();
+                                          final isVisible = distance < 1.0;
+                                          
+                                          return Offstage(
+                                            offstage: !isVisible,
+                                            child: TickerMode(
+                                              enabled: isVisible,
+                                              child: Opacity(
+                                                opacity: (1.0 - distance).clamp(0.0, 1.0),
+                                                child: widget.children[index],
+                                              ),
+                                            ),
+                                          );
+                                        }),
+                                      );
+                                    },
+                                  ),
                                 ),
                                 const Padding(
                                   padding: EdgeInsets.only(
@@ -120,26 +181,12 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                   ),
                 ),
                 bottomNavigationBar: !isLargeScreen
-                    ? NavigationBar(
-                        backgroundColor: Theme.of(context).colorScheme.surface,
-                        indicatorColor: Colors.transparent,
-                        elevation: 0,
+                    ? CustomBottomNavigationBar(
+                        items: items,
                         selectedIndex: _getCurrentIndex(items, isOfflineMode),
-                        labelBehavior: languageSetting == const Locale('en', '')
-                            ? NavigationDestinationLabelBehavior
-                                  .onlyShowSelected
-                            : NavigationDestinationLabelBehavior.alwaysHide,
+                        animation: _animation,
                         onDestinationSelected: (index) =>
                             _onTabTapped(index, items),
-                        destinations: items
-                            .map(
-                              (item) => NavigationDestination(
-                                icon: Icon(item.icon),
-                                selectedIcon: Icon(item.selectedIcon),
-                                label: item.label,
-                              ),
-                            )
-                            .toList(),
                       )
                     : null,
               );
@@ -202,7 +249,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
     // If we're switching to offline mode and currently on search tab
     if (isOfflineMode && currentRoute.startsWith('/search')) {
       // Navigate to home
-      widget.child.goBranch(0);
+      widget.navigationShell.goBranch(0);
     }
   }
 
@@ -217,9 +264,9 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
       // If user taps the same tab again, reset it to initial state.
       // Otherwise, preserve the branch state.
       if (isReselect) {
-        widget.child.goBranch(item.shellIndex, initialLocation: true);
+        widget.navigationShell.goBranch(item.shellIndex, initialLocation: true);
       } else {
-        widget.child.goBranch(item.shellIndex);
+        widget.navigationShell.goBranch(item.shellIndex);
       }
 
       _previousTabIndex = index;
@@ -227,7 +274,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
   }
 
   int _getCurrentIndex(List<_NavigationItem> items, bool isOfflineMode) {
-    final currentShellIndex = widget.child.currentIndex;
+    final currentShellIndex = widget.navigationShell.currentIndex;
 
     if (items.isEmpty) return 0;
 
@@ -260,4 +307,121 @@ class _NavigationItem {
   final String label;
   final String route;
   final int shellIndex;
+}
+
+class CustomBottomNavigationBar extends StatelessWidget {
+  const CustomBottomNavigationBar({
+    required this.items,
+    required this.selectedIndex,
+    required this.onDestinationSelected,
+    required this.animation,
+    super.key,
+  });
+
+  final List<_NavigationItem> items;
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
+  final Animation<double> animation;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    return Container(
+      height: 70,
+      color: theme.colorScheme.surface,
+      child: Stack(
+        children: [
+          // The animated pill
+          AnimatedBuilder(
+            animation: animation,
+            builder: (context, child) {
+              // Calculate the alignment based on the continuous animation value
+              // 0 -> -1.0, 1 -> x, items.length - 1 -> 1.0
+              final t = items.length > 1 ? animation.value / (items.length - 1) : 0.0;
+              final alignmentX = -1.0 + (t * 2.0);
+              
+              return Align(
+                alignment: Alignment(alignmentX, 0),
+                child: FractionallySizedBox(
+                  widthFactor: 1.0 / items.length,
+                  child: Center(
+                    child: Container(
+                      width: 64,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          
+          // The icons and labels
+          Row(
+            children: List.generate(items.length, (index) {
+              final item = items[index];
+              return Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onDestinationSelected(index),
+                  child: AnimatedBuilder(
+                    animation: animation,
+                    builder: (context, child) {
+                      // Distance from the current animating index to this item's index
+                      // 0.0 means perfectly centered on this item.
+                      // 1.0 or greater means the pill is completely on another item.
+                      final distance = (animation.value - index).abs();
+                      final isSelected = distance < 0.5;
+                      final t = (1.0 - distance).clamp(0.0, 1.0); // 1.0 when active, 0.0 when inactive
+
+                      final iconColor = Color.lerp(
+                        colorScheme.onSurfaceVariant,
+                        colorScheme.onPrimaryContainer,
+                        t,
+                      );
+                      
+                      final labelColor = Color.lerp(
+                        colorScheme.onSurfaceVariant,
+                        colorScheme.onSurface,
+                        t,
+                      );
+
+                      final fontWeight = isSelected ? FontWeight.w600 : FontWeight.w500;
+
+                      return Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isSelected ? item.selectedIcon : item.icon,
+                            color: iconColor,
+                            size: 24,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            item.label,
+                            style: TextStyle(
+                              color: labelColor,
+                              fontSize: 12,
+                              fontWeight: fontWeight,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -2,7 +2,7 @@ name: musify
 description: Music Streaming app made in Flutter!
 
 publish_to: 'none'
-version: 10.1.17+193 # run update.sh after changing the version
+version: 10.1.18+194 # run update.sh after changing the version
 
 environment:
   sdk: '>=3.12.0 <4.0.0'
@@ -29,6 +29,7 @@ dependencies:
   intl: ^0.20.2
   just_audio: 0.10.5
   open_filex: ^4.7.0
+  palette_generator: ^0.3.3+7
   path_provider: ^2.1.6
   receive_sharing_intent:
     path: ./packages/receive_sharing_intent
@@ -47,6 +48,11 @@ dev_dependencies:
 
   # flutter_lints: ^2.0.0
 
+flutter_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/app_logo.png"
+
 flutter:
   generate: true
   uses-material-design: true
@@ -55,6 +61,7 @@ flutter:
   assets:
     - assets/licenses/
     - assets/icons/musify_icon.png
+    - assets/app_logo.png
 
   fonts:
     - family: paytoneOne

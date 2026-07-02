@@ -221,90 +221,91 @@ class _SearchPageState extends State<SearchPage> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n!.search)),
-      body: GestureDetector(
-        onTap: _inputNode.unfocus,
-        behavior: HitTestBehavior.translucent,
-        child: SingleChildScrollView(
-          padding: commonSingleChildScrollViewPadding,
-          child: Column(
-            children: <Widget>[
-              // ─── Search Bar ───
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isWide = constraints.maxWidth > 600;
-                  final bar = ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: isWide ? 600 : double.infinity,
-                    ),
-                    child: CustomSearchBar(
-                      loadingProgressNotifier: _fetchingSongs,
-                      controller: _searchBar,
-                      focusNode: _inputNode,
-                      labelText: '${context.l10n!.search}...',
-                      onChanged: (value) {
-                        // debounce suggestions to avoid rapid API calls
-                        _debounce?.cancel();
-                        final query = value;
-                        final requestId = ++_latestSuggestionRequest;
+      body: SafeArea(
+        child: GestureDetector(
+          onTap: _inputNode.unfocus,
+          behavior: HitTestBehavior.translucent,
+          child: SingleChildScrollView(
+            padding: commonSingleChildScrollViewPadding,
+            child: Column(
+              children: <Widget>[
+                // ─── Search Bar ───
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth > 600;
+                    final bar = ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: isWide ? 600 : double.infinity,
+                      ),
+                      child: CustomSearchBar(
+                        loadingProgressNotifier: _fetchingSongs,
+                        controller: _searchBar,
+                        focusNode: _inputNode,
+                        labelText: '${context.l10n!.search}...',
+                        onChanged: (value) {
+                          // debounce suggestions to avoid rapid API calls
+                          _debounce?.cancel();
+                          final query = value;
+                          final requestId = ++_latestSuggestionRequest;
 
-                        // Clear suggestions immediately if input is empty
-                        if (query.isEmpty) {
-                          _suggestionsList = [];
-                          if (mounted) setState(() {});
-                          return;
-                        }
-
-                        _debounce = Timer(
-                          const Duration(milliseconds: 300),
-                          () async {
-                            final searchSuggestions = await getSearchSuggestions(
-                              query,
-                            );
-
-                            if (!mounted ||
-                                requestId != _latestSuggestionRequest ||
-                                _searchBar.text != query) {
-                              return;
-                            }
-
-                            _suggestionsList = List<String>.from(
-                              searchSuggestions,
-                            );
+                          // Clear suggestions immediately if input is empty
+                          if (query.isEmpty) {
+                            _suggestionsList = [];
                             if (mounted) setState(() {});
-                          },
-                        );
-                      },
-                      onSubmitted: (String value) {
-                        _submitSearch();
-                      },
-                    ),
-                  );
-                  if (isWide) {
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [bar],
-                    );
-                  } else {
-                    return bar;
-                  }
-                },
-              ),
+                            return;
+                          }
 
-              // ─── Main Content Area ───
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: _suggestionsList.isNotEmpty
-                    // Show API suggestions when user is typing
-                    ? _buildSuggestionsList(colorScheme)
-                    : _hasSearchResults
-                        // Show search results
-                        ? _buildSearchResults(context, primaryColor)
-                        // Show home screen (history dropdown + chips + recommendations)
-                        : _buildHomeContent(context, primaryColor, colorScheme),
-              ),
-              const MiniPlayerBottomSpace(),
-            ],
+                          _debounce = Timer(
+                            const Duration(milliseconds: 300),
+                            () async {
+                              final searchSuggestions = await getSearchSuggestions(
+                                query,
+                              );
+
+                              if (!mounted ||
+                                  requestId != _latestSuggestionRequest ||
+                                  _searchBar.text != query) {
+                                return;
+                              }
+
+                              _suggestionsList = List<String>.from(
+                                searchSuggestions,
+                              );
+                              if (mounted) setState(() {});
+                            },
+                          );
+                        },
+                        onSubmitted: (String value) {
+                          _submitSearch();
+                        },
+                      ),
+                    );
+                    if (isWide) {
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [bar],
+                      );
+                    } else {
+                      return bar;
+                    }
+                  },
+                ),
+
+                // ─── Main Content Area ───
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: _suggestionsList.isNotEmpty
+                      // Show API suggestions when user is typing
+                      ? _buildSuggestionsList(colorScheme)
+                      : _hasSearchResults
+                          // Show search results
+                          ? _buildSearchResults(context, primaryColor)
+                          // Show home screen (history dropdown + chips + recommendations)
+                          : _buildHomeContent(context, primaryColor, colorScheme),
+                ),
+                const MiniPlayerBottomSpace(),
+              ],
+            ),
           ),
         ),
       ),

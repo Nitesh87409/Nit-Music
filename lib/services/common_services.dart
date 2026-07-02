@@ -133,7 +133,7 @@ Future<List> getTrendingSongs() async {
 Future<List> fetchSongsList(String searchQuery) async {
   try {
     // If not in cache, perform the search
-    final List<Video> searchResults = await ytClient.search.search(searchQuery);
+    final VideoSearchList searchResults = await ytClient.search.search(searchQuery);
     final songsList = searchResults
         .map((video) => returnSongLayout(0, video))
         .toList();
@@ -142,6 +142,46 @@ Future<List> fetchSongsList(String searchQuery) async {
   } catch (e, stackTrace) {
     logger.log('Error in fetchSongsList', error: e, stackTrace: stackTrace);
     return [];
+  }
+}
+
+Future<Map<String, dynamic>> fetchSongsListWithPagination(String searchQuery) async {
+  try {
+    final VideoSearchList searchResults = await ytClient.search.search(searchQuery);
+    final songsList = searchResults
+        .map((video) => returnSongLayout(0, video))
+        .toList();
+
+    return {
+      'songs': songsList,
+      'nextPage': searchResults,
+    };
+  } catch (e, stackTrace) {
+    logger.log('Error in fetchSongsListWithPagination', error: e, stackTrace: stackTrace);
+    return {'songs': [], 'nextPage': null};
+  }
+}
+
+Future<Map<String, dynamic>> fetchNextSongsList(dynamic currentList) async {
+  if (currentList == null || currentList is! VideoSearchList) {
+    return {'songs': [], 'nextPage': null};
+  }
+  
+  try {
+    final VideoSearchList? searchResults = await currentList.nextPage();
+    if (searchResults == null) return {'songs': [], 'nextPage': null};
+    
+    final songsList = searchResults
+        .map((video) => returnSongLayout(0, video))
+        .toList();
+
+    return {
+      'songs': songsList,
+      'nextPage': searchResults,
+    };
+  } catch (e, stackTrace) {
+    logger.log('Error in fetchNextSongsList', error: e, stackTrace: stackTrace);
+    return {'songs': [], 'nextPage': null};
   }
 }
 

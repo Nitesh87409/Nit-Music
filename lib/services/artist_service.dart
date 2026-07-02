@@ -200,7 +200,10 @@ Future<Map<String, dynamic>?> getArtistCatalog(
       await deleteData('cache', '${cacheKey}_date');
     }
 
-    final songs = await _buildArtistCatalogFromMusic(artist);
+    final catalogData = await _buildArtistCatalogFromMusic(artist);
+    final songs = catalogData['songs'] as List<dynamic>? ?? [];
+    final unfetchedReleases = catalogData['unfetchedReleases'] as List<dynamic>? ?? [];
+    
     if (songs.isEmpty) {
       logger.log(
         'Artist catalog not found: no YouTube Music releases for '
@@ -222,8 +225,9 @@ Future<Map<String, dynamic>?> getArtistCatalog(
       'source': 'youtube-artist',
       'isArtist': true,
       'catalogStatus': 'complete',
-      'isCatalogComplete': true,
+      'isCatalogComplete': unfetchedReleases.isEmpty,
       'list': songs,
+      'unfetchedReleases': unfetchedReleases,
     };
 
     unawaited(addOrUpdateData<Map>('cache', cacheKey, artistPlaylist));
@@ -433,11 +437,11 @@ List<Map<String, dynamic>> _dedupeResolvedArtists(
   return unique;
 }
 
-Future<List<Map<String, dynamic>>> _buildArtistCatalogFromMusic(
+Future<Map<String, dynamic>> _buildArtistCatalogFromMusic(
   Map<String, dynamic> artist,
 ) async {
   final artistId = artist['ytid']?.toString() ?? '';
-  if (!_isChannelId(artistId)) return [];
+  if (!_isChannelId(artistId)) return {'songs': [], 'unfetchedReleases': []};
 
   final artistName = normalizeArtistDisplayTitle(
     artist['title']?.toString() ??
@@ -453,25 +457,60 @@ Future<List<Map<String, dynamic>>> _buildArtistCatalogFromMusic(
 
     if (releases.isEmpty) {
       logger.log('YouTube Music discography empty for $artistName ($artistId)');
-      return [];
+      return {'songs': [], 'unfetchedReleases': []};
     }
 
     final songs = <Map<String, dynamic>>[];
-    for (var i = 0; i < releases.length; i += _musicAlbumBatchSize) {
-      final batch = releases.skip(i).take(_musicAlbumBatchSize);
+    final unfetchedReleases = <Map<String, dynamic>>[];
+    
+    for (var release in releases) {
+      unfetchedReleases.add({
+        'id': release.id.toString(),
+        'title': release.title,
+      });
+    }
+
+    int albumsProcessed = 0;
+    while (songs.length < 50 && unfetchedReleases.isNotEmpty && albumsProcessed < 10) {
+      final batchSize = _musicAlbumBatchSize;
+      final batchToProcess = unfetchedReleases.take(batchSize).toList();
+      unfetchedReleases.removeRange(0, batchToProcess.length);
+      
       final batchResults = await Future.wait(
-        batch.map((album) => _loadAlbumSongs(album, artistId, artistName)),
+        batchToProcess.map((album) => _loadAlbumSongsById(album['id'].toString(), artistId, artistName)),
       );
+      
       for (final albumSongs in batchResults) {
         songs.addAll(albumSongs);
       }
+      albumsProcessed += batchToProcess.length;
     }
 
     final catalog = dedupeArtistCatalogSongs(songs);
-    return catalog;
+    return {'songs': catalog, 'unfetchedReleases': unfetchedReleases};
   } catch (e, stackTrace) {
     logger.log(
       'YouTube Music discography failed for $artistName ($artistId)',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return {'songs': [], 'unfetchedReleases': []};
+  }
+}
+
+Future<List<Map<String, dynamic>>> _loadAlbumSongsById(
+  String albumId,
+  String channelId,
+  String artistName,
+) async {
+  try {
+    final tracks = await ytMusicClient.music
+        .getAlbumTracks(albumId, author: artistName, channelId: channelId)
+        .timeout(_musicAlbumTimeout);
+    return [for (final track in tracks) returnSongLayout(0, track)];
+  } catch (e, stackTrace) {
+    logger.log(
+      'Could not load YouTube Music album $albumId',
       error: e,
       stackTrace: stackTrace,
     );
@@ -479,24 +518,42 @@ Future<List<Map<String, dynamic>>> _buildArtistCatalogFromMusic(
   }
 }
 
+Future<Map<String, dynamic>> loadMoreArtistSongs(
+  List<dynamic> currentUnfetchedReleases,
+  String artistId,
+  String artistName,
+) async {
+  final songs = <Map<String, dynamic>>[];
+  final unfetchedReleases = List<Map<String, dynamic>>.from(currentUnfetchedReleases);
+  
+  if (unfetchedReleases.isEmpty) return {'songs': [], 'unfetchedReleases': []};
+  
+  int albumsProcessed = 0;
+  while (songs.length < 50 && unfetchedReleases.isNotEmpty && albumsProcessed < 10) {
+    final batchSize = _musicAlbumBatchSize;
+    final batchToProcess = unfetchedReleases.take(batchSize).toList();
+    unfetchedReleases.removeRange(0, batchToProcess.length);
+    
+    final batchResults = await Future.wait(
+      batchToProcess.map((album) => _loadAlbumSongsById(album['id'].toString(), artistId, artistName)),
+    );
+    
+    for (final albumSongs in batchResults) {
+      songs.addAll(albumSongs);
+    }
+    albumsProcessed += batchToProcess.length;
+  }
+  
+  final catalog = dedupeArtistCatalogSongs(songs);
+  return {'songs': catalog, 'unfetchedReleases': unfetchedReleases};
+}
+
 Future<List<Map<String, dynamic>>> _loadAlbumSongs(
   MusicAlbum album,
   String channelId,
   String artistName,
 ) async {
-  try {
-    final tracks = await ytMusicClient.music
-        .getAlbumTracks(album.id, author: artistName, channelId: channelId)
-        .timeout(_musicAlbumTimeout);
-    return [for (final track in tracks) returnSongLayout(0, track)];
-  } catch (e, stackTrace) {
-    logger.log(
-      'Could not load YouTube Music album ${album.title} (${album.id})',
-      error: e,
-      stackTrace: stackTrace,
-    );
-    return [];
-  }
+  return _loadAlbumSongsById(album.id.toString(), channelId, artistName);
 }
 
 bool _sameArtistPageSongTitle(String title, String artist) {

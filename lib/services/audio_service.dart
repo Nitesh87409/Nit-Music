@@ -905,6 +905,9 @@ class MusifyAudioHandler extends BaseAudioHandler {
     try {
       final manuallyAddedSongs = replace ? _getUnplayedManualSongs() : <Map>[];
       if (replace) {
+        if (_queueList.isNotEmpty && _currentQueueIndex >= 0 && _currentQueueIndex < _queueList.length) {
+          _addToHistory(_queueList[_currentQueueIndex]);
+        }
         _queueList.clear();
         _originalQueueList.clear();
         _currentQueueIndex = 0;
@@ -1095,6 +1098,10 @@ class MusifyAudioHandler extends BaseAudioHandler {
               _currentQueueIndex < _queueList.length
           ? cloneMap(_queueList[_currentQueueIndex])
           : null;
+
+      if (currentSong != null) {
+        _addToHistory(currentSong);
+      }
 
       _queueList.clear();
       _originalQueueList.clear();

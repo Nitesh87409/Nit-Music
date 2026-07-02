@@ -1,4 +1,4 @@
-﻿import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:musify/constants/app_constants.dart';
@@ -18,6 +18,9 @@ import 'package:musify/widgets/playlist_cube.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/song_bar.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:async';
+import 'package:audio_service/audio_service.dart';
+import 'package:palette_generator/palette_generator.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -30,6 +33,8 @@ class _HomePageState extends State<HomePage> {
   late final Future<List> _suggestedPlaylistsFuture;
   late Future<List> _recommendedSongsFuture;
   late final Future<List> _trendingSongsFuture;
+  StreamSubscription? _mediaItemSub;
+  Color? _dynamicColor;
 
   @override
   void initState() {
@@ -40,12 +45,32 @@ class _HomePageState extends State<HomePage> {
     _recommendedSongsFuture = getRecommendedSongs();
     _trendingSongsFuture = getTrendingSongs();
     externalRecommendations.addListener(_refreshRecommendedSongs);
+    _mediaItemSub = audioHandler.mediaItem.listen(_updatePalette);
   }
 
   @override
   void dispose() {
     externalRecommendations.removeListener(_refreshRecommendedSongs);
+    _mediaItemSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _updatePalette(MediaItem? item) async {
+    if (item?.artUri == null) {
+      if (mounted) setState(() => _dynamicColor = null);
+      return;
+    }
+    try {
+      final palette = await PaletteGenerator.fromImageProvider(
+        NetworkImage(item!.artUri!.toString()),
+        maximumColorCount: 5,
+      );
+      if (mounted) {
+        setState(() {
+          _dynamicColor = palette.vibrantColor?.color ?? palette.dominantColor?.color;
+        });
+      }
+    } catch (_) {}
   }
 
   void _refreshRecommendedSongs() {
@@ -115,11 +140,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildTopBar(BuildContext context) {
+    final titleColor = _dynamicColor ?? const Color(0xFFA67CFF);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         IconButton(
-          icon: Icon(Icons.menu, color: Theme.of(context).colorScheme.onSurface, size: 28),
+          icon: Image.asset('assets/app_logo.png', width: 28, height: 28),
           onPressed: () {
             Scaffold.of(context).openDrawer();
           },
@@ -134,20 +160,13 @@ class _HomePageState extends State<HomePage> {
             letterSpacing: -0.5,
           ),
         ),
-        ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            colors: [Color(0xFFA67CFF), Color(0xFF5A75FF)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ).createShader(bounds),
-          child: Text(
-            'Music',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontWeight: FontWeight.bold,
-              fontSize: 26,
-              letterSpacing: -0.5,
-            ),
+        Text(
+          'Music',
+          style: TextStyle(
+            color: titleColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 26,
+            letterSpacing: -0.5,
           ),
         ),
       ],
@@ -295,13 +314,21 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             TextButton(
-              onPressed: () {},
+              onPressed: () {
+                context.push(
+                  '/home/generic_grid',
+                  extra: {
+                    'title': 'Your top mixes',
+                    'items': playlists,
+                  },
+                );
+              },
               style: TextButton.styleFrom(
                 padding: EdgeInsets.zero,
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: Text(
+              child: const Text(
                 'See all',
                 style: TextStyle(
                   color: Color(0xFFA67CFF),
@@ -546,13 +573,21 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             TextButton(
-              onPressed: () {},
+              onPressed: () {
+                context.push(
+                  '/home/playlist_data',
+                  extra: {
+                    'title': 'Recommended for you',
+                    'list': data,
+                  },
+                );
+              },
               style: TextButton.styleFrom(
                 padding: EdgeInsets.zero,
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: Text(
+              child: const Text(
                 'See all',
                 style: TextStyle(
                   color: Color(0xFFA67CFF),
