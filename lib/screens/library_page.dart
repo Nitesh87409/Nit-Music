@@ -157,10 +157,10 @@ class _LibraryPageState extends State<LibraryPage> {
           children: [
             const Icon(FluentIcons.library_24_filled, color: Color(0xFFA67CFF), size: 28),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               'My Library',
               style: TextStyle(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 22,
                 fontWeight: FontWeight.w600,
               ),
@@ -178,9 +178,9 @@ class _LibraryPageState extends State<LibraryPage> {
                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   FluentIcons.folder_add_24_regular,
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onSurface,
                   size: 20,
                 ),
               ),
@@ -320,8 +320,8 @@ class _LibraryPageState extends State<LibraryPage> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -364,10 +364,10 @@ class _LibraryPageState extends State<LibraryPage> {
     if (items.isEmpty) return [];
 
     return [
-      const SliverToBoxAdapter(
+      SliverToBoxAdapter(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Text('Pinned Playlists', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Text('Pinned Playlists', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
         ),
       ),
       _buildSliverPlaylistList(items),
@@ -409,10 +409,10 @@ class _LibraryPageState extends State<LibraryPage> {
 
     if (hasFolders || hasCustomPlaylists) {
       slivers.add(
-        const SliverToBoxAdapter(
+        SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Text('Custom Playlists', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Text('Custom Playlists', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
           ),
         ),
       );
@@ -437,10 +437,10 @@ class _LibraryPageState extends State<LibraryPage> {
     if (offlinePlaylists.isNotEmpty) {
       slivers
         ..add(
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Text('Offline Playlists', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Text('Offline Playlists', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
             ),
           ),
         )
@@ -451,10 +451,10 @@ class _LibraryPageState extends State<LibraryPage> {
 
     if (!offlineMode.value && userPlaylists.value.isNotEmpty) {
       slivers.add(
-        const SliverToBoxAdapter(
+        SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Text('Added Playlists', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Text('Added Playlists', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
           ),
         ),
       );
@@ -488,10 +488,10 @@ class _LibraryPageState extends State<LibraryPage> {
     final likedPlaylists = getLikedPlaylistItems();
     if (likedPlaylists.isEmpty) return [];
     return [
-      const SliverToBoxAdapter(
+      SliverToBoxAdapter(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Text('Liked Playlists', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Text('Liked Playlists', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
         ),
       ),
       _buildSliverPlaylistList(likedPlaylists),
@@ -502,10 +502,10 @@ class _LibraryPageState extends State<LibraryPage> {
     final likedArtists = getLikedArtistItems(offlineOnly: offlineMode.value);
     if (likedArtists.isEmpty) return [];
     return [
-      const SliverToBoxAdapter(
+      SliverToBoxAdapter(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Text('Artists', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Text('Artists', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
         ),
       ),
       _buildSliverPlaylistList(likedArtists),

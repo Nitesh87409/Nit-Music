@@ -75,11 +75,17 @@ class NowPlayingControls extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        MarqueeTextWidget(
-                          text: metadata.title,
-                          fontColor: colorScheme.onSurface,
-                          fontSize: titleFontSize * fontScale,
-                          fontWeight: FontWeight.bold,
+                        Hero(
+                          tag: 'now_playing_title',
+                          child: Material(
+                            type: MaterialType.transparency,
+                            child: MarqueeTextWidget(
+                              text: metadata.title,
+                              fontColor: colorScheme.onSurface,
+                              fontSize: titleFontSize * fontScale,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                         SizedBox(height: spacing),
                         if (metadata.artist != null)

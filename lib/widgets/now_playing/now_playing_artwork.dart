@@ -16,10 +16,12 @@ class NowPlayingArtwork extends StatelessWidget {
     required this.size,
     required this.metadata,
     required this.lyricsController,
+    this.dominantColor,
   });
   final Size size;
   final MediaItem metadata;
   final FlipCardController lyricsController;
+  final Color? dominantColor;
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +63,7 @@ class NowPlayingArtwork extends StatelessWidget {
               borderRadius: BorderRadius.circular(borderRadius),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                  color: (dominantColor ?? const Color(0xFF8B5CF6)).withValues(alpha: 0.4),
                   blurRadius: 40,
                   offset: const Offset(0, 4),
                   spreadRadius: 4,
@@ -87,7 +89,7 @@ class NowPlayingArtwork extends StatelessWidget {
           borderRadius: BorderRadius.circular(borderRadius),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+              color: (dominantColor ?? const Color(0xFF8B5CF6)).withValues(alpha: 0.4),
               blurRadius: 40,
               offset: const Offset(0, 4),
               spreadRadius: 4,

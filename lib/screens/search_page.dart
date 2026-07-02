@@ -265,8 +265,13 @@ class _SearchPageState extends State<SearchPage> {
                           _debounce = Timer(
                             const Duration(milliseconds: 300),
                             () async {
+                              // Append 'song' to get music-related suggestions only
+                              final searchQuery = query.toLowerCase().endsWith('song') 
+                                  ? query 
+                                  : '$query song';
+                              
                               final searchSuggestions = await getSearchSuggestions(
-                                query,
+                                searchQuery,
                               );
 
                               if (!mounted ||
@@ -275,10 +280,25 @@ class _SearchPageState extends State<SearchPage> {
                                 return;
                               }
 
+                              // Limit to 5 suggestions so it doesn't take up the whole screen
                               _suggestionsList = List<String>.from(
                                 searchSuggestions,
-                              );
+                              ).take(5).toList();
+                              
                               if (mounted) setState(() {});
+                            },
+                          );
+
+                          // Phase 2: Live Search Debounce (700ms) for heavy API calls
+                          _liveSearchDebounce?.cancel();
+                          final liveRequestId = ++_latestLiveSearchRequest;
+                          
+                          _liveSearchDebounce = Timer(
+                            const Duration(milliseconds: 700),
+                            () async {
+                              if (_searchBar.text.trim().length >= 2) {
+                                await search(requestId: liveRequestId);
+                              }
                             },
                           );
                         },
@@ -301,14 +321,18 @@ class _SearchPageState extends State<SearchPage> {
                 // ─── Main Content Area ───
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 200),
-                  child: _suggestionsList.isNotEmpty
-                      // Show API suggestions when user is typing
-                      ? _buildSuggestionsList(colorScheme)
-                      : _hasSearchResults
-                          // Show search results
-                          ? _buildSearchResults(context, primaryColor)
-                          // Show home screen (history dropdown + chips + recommendations)
-                          : _buildHomeContent(context, primaryColor, colorScheme),
+                  child: (_suggestionsList.isNotEmpty || _hasSearchResults)
+                      ? Column(
+                          key: ValueKey('search-active-${_searchBar.text}'),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (_suggestionsList.isNotEmpty)
+                              _buildSuggestionsList(colorScheme),
+                            if (_hasSearchResults)
+                              _buildSearchResults(context, primaryColor),
+                          ],
+                        )
+                      : _buildHomeContent(context, primaryColor, colorScheme),
                 ),
                 const MiniPlayerBottomSpace(),
               ],
@@ -399,136 +423,97 @@ class _SearchPageState extends State<SearchPage> {
           return const SizedBox.shrink();
         }
 
-        // Show max 6 compact items
-        final displayItems = history.take(6).toList();
+        // Show max 5 compact items
+        final displayItems = history.take(5).toList();
 
         return AnimatedSize(
           duration: const Duration(milliseconds: 200),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-              ),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (int i = 0; i < displayItems.length; i++)
-                  InkWell(
-                    onTap: () async {
-                      await _submitSearch(displayItems[i].toString());
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (int i = 0; i < displayItems.length; i++)
+                ListTile(
+                  leading: Icon(
+                    FluentIcons.history_24_regular,
+                    color: colorScheme.onSurfaceVariant,
+                    size: 22,
+                  ),
+                  title: Text(
+                    displayItems[i].toString(),
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontSize: 16,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: GestureDetector(
+                    onTap: () {
+                      // Insert text into search bar
+                      _searchBar.text = displayItems[i].toString();
+                      _searchBar.selection = TextSelection.fromPosition(
+                        TextPosition(offset: _searchBar.text.length),
+                      );
                     },
-                    onLongPress: () async {
-                      final confirm =
-                          await _showConfirmationDialog(context) ?? false;
-                      if (confirm && history.contains(displayItems[i])) {
-                        final updatedHistory = List.from(history)
-                          ..remove(displayItems[i]);
-                        searchHistoryNotifier.value = updatedHistory;
-                        unawaited(
-                          addOrUpdateData<List>(
-                            'user',
-                            'searchHistory',
-                            updatedHistory,
-                          ),
-                        );
-                      }
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            FluentIcons.history_24_regular,
-                            size: 18,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              displayItems[i].toString(),
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: colorScheme.onSurface,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              // Insert text into search bar
-                              _searchBar.text = displayItems[i].toString();
-                              _searchBar.selection =
-                                  TextSelection.fromPosition(
-                                TextPosition(
-                                  offset: _searchBar.text.length,
-                                ),
-                              );
-                            },
-                            child: Icon(
-                              FluentIcons.arrow_upload_24_regular,
-                              size: 16,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
+                    child: Icon(
+                      FluentIcons.arrow_up_left_24_regular,
+                      color: colorScheme.onSurfaceVariant,
+                      size: 22,
                     ),
                   ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                  visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
+                  dense: true,
+                  onTap: () async {
+                    await _submitSearch(displayItems[i].toString());
+                  },
+                  onLongPress: () async {
+                    final confirm = await _showConfirmationDialog(context) ?? false;
+                    if (confirm && history.contains(displayItems[i])) {
+                      final updatedHistory = List.from(history)..remove(displayItems[i]);
+                      searchHistoryNotifier.value = updatedHistory;
+                      unawaited(
+                        addOrUpdateData<List>('user', 'searchHistory', updatedHistory),
+                      );
+                    }
+                  },
+                ),
 
-                // Clear All button
-                if (displayItems.length > 2)
-                  InkWell(
-                    onTap: () async {
-                      final confirm =
-                          await _showConfirmationDialog(context) ?? false;
-                      if (confirm) {
-                        searchHistoryNotifier.value = [];
-                        unawaited(
-                          addOrUpdateData<List>(
-                            'user',
-                            'searchHistory',
-                            [],
+              // Clear All button
+              if (displayItems.length > 2)
+                InkWell(
+                  onTap: () async {
+                    final confirm = await _showConfirmationDialog(context) ?? false;
+                    if (confirm) {
+                      searchHistoryNotifier.value = [];
+                      unawaited(addOrUpdateData<List>('user', 'searchHistory', []));
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          FluentIcons.delete_24_regular,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Clear All',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
-                        );
-                      }
-                    },
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            FluentIcons.delete_24_regular,
-                            size: 16,
-                            color: Color(0xFF8B5CF6),
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'Clear All',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF8B5CF6),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-              ],
-            ),
+                ),
+              const SizedBox(height: 8),
+            ],
           ),
         );
       },

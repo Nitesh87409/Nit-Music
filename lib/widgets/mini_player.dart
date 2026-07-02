@@ -132,18 +132,18 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
   PageRoute<void> _createSlideTransition() {
     return PageRouteBuilder<void>(
       pageBuilder: (context, animation, _) => const NowPlayingPage(),
-      transitionDuration: const Duration(milliseconds: 350),
-      reverseTransitionDuration: const Duration(milliseconds: 300),
+      transitionDuration: const Duration(milliseconds: 400),
+      reverseTransitionDuration: const Duration(milliseconds: 350),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        final slideAnimation = Tween<Offset>(
-          begin: const Offset(0, 1),
-          end: Offset.zero,
+        final fadeAnimation = Tween<double>(
+          begin: 0.0,
+          end: 1.0,
         ).animate(CurvedAnimation(
           parent: animation,
           curve: Curves.easeOutCubic,
           reverseCurve: Curves.easeInCubic,
         ));
-        return SlideTransition(position: slideAnimation, child: child);
+        return FadeTransition(opacity: fadeAnimation, child: child);
       },
     );
   }
@@ -187,19 +187,19 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
                         child: Container(
                           height: MiniPlayer.playerHeight,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF181534).withValues(
+                            color: colorScheme.surfaceContainerHighest.withValues(
                               alpha: 0.95,
                             ),
                             borderRadius: BorderRadius.circular(
                               MiniPlayer._borderRadius,
                             ),
                             border: Border.all(
-                              color: const Color(0xFFA67CFF).withValues(alpha: 0.3),
+                              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
                               width: 1,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                                color: colorScheme.shadow.withValues(alpha: 0.1),
                                 blurRadius: 16,
                                 spreadRadius: 1,
                                 offset: const Offset(0, 2),
@@ -245,10 +245,16 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
                                   ),
                               child: KeyedSubtree(
                                 key: ValueKey(metadata.id),
-                                child: _MetadataWidget(
-                                  title: metadata.title,
-                                  artist: metadata.artist,
-                                  colorScheme: colorScheme,
+                                child: Hero(
+                                  tag: 'now_playing_title',
+                                  child: Material(
+                                    type: MaterialType.transparency,
+                                    child: _MetadataWidget(
+                                      title: metadata.title,
+                                      artist: metadata.artist,
+                                      colorScheme: colorScheme,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -387,9 +393,9 @@ class _ControlsWidget extends StatelessWidget {
             onPressed: audioHandler.skipToPrevious,
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,
-            icon: const Icon(
+            icon: Icon(
               FluentIcons.previous_24_filled,
-              color: Colors.white,
+              color: colorScheme.onSurface,
               size: 20,
             ),
             visualDensity: VisualDensity.compact,
@@ -407,9 +413,9 @@ class _ControlsWidget extends StatelessWidget {
             onPressed: audioHandler.skipToNext,
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,
-            icon: const Icon(
+            icon: Icon(
               FluentIcons.next_24_filled,
-              color: Colors.white,
+              color: colorScheme.onSurface,
               size: 20,
             ),
             visualDensity: VisualDensity.compact,

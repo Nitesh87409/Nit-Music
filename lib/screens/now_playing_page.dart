@@ -124,6 +124,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                                   adjustedIconSize: baseIconSize,
                                   adjustedMiniIconSize: miniIconSize,
                                   lyricsController: _lyricsController,
+                                  dominantColor: _dominantColor,
                                 )
                               : _MobileLayout(
                                   metadata: metadata,
@@ -132,6 +133,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                                   adjustedMiniIconSize: miniIconSize,
                                   isLargeScreen: isLargeScreen,
                                   lyricsController: _lyricsController,
+                                  dominantColor: _dominantColor,
                                 ),
                         ),
                       ],
@@ -191,12 +193,14 @@ class _DesktopLayout extends StatelessWidget {
     required this.adjustedIconSize,
     required this.adjustedMiniIconSize,
     required this.lyricsController,
+    this.dominantColor,
   });
   final MediaItem metadata;
   final Size size;
   final double adjustedIconSize;
   final double adjustedMiniIconSize;
   final FlipCardController lyricsController;
+  final Color? dominantColor;
 
   @override
   Widget build(BuildContext context) {
@@ -215,6 +219,7 @@ class _DesktopLayout extends StatelessWidget {
                       size: size,
                       metadata: metadata,
                       lyricsController: lyricsController,
+                      dominantColor: dominantColor,
                     ),
                   ),
                 ),
@@ -255,6 +260,7 @@ class _MobileLayout extends StatelessWidget {
     required this.adjustedMiniIconSize,
     required this.isLargeScreen,
     required this.lyricsController,
+    this.dominantColor,
   });
   final MediaItem metadata;
   final Size size;
@@ -262,6 +268,7 @@ class _MobileLayout extends StatelessWidget {
   final double adjustedMiniIconSize;
   final bool isLargeScreen;
   final FlipCardController lyricsController;
+  final Color? dominantColor;
 
   @override
   Widget build(BuildContext context) {
@@ -286,6 +293,7 @@ class _MobileLayout extends StatelessWidget {
                 size: size,
                 metadata: metadata,
                 lyricsController: lyricsController,
+                dominantColor: dominantColor,
               ),
             ),
           ),
@@ -325,6 +333,7 @@ class _MobileLayout extends StatelessWidget {
                 size: size,
                 metadata: metadata,
                 lyricsController: lyricsController,
+                dominantColor: dominantColor,
               ),
             ),
           ),

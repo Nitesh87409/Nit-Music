@@ -68,11 +68,10 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
               child: Opacity(
                 opacity: _opacityAnimation.value,
                 child: Image.asset(
-                  'assets/logo.png',
+                  'assets/app_logo.png',
                   width: 200,
                   height: 200,
                   fit: BoxFit.contain,
-                  colorBlendMode: BlendMode.lighten,
                 ),
               ),
             );

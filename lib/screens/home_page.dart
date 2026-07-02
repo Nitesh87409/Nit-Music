@@ -150,7 +150,10 @@ class _HomePageState extends State<HomePage> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         IconButton(
-          icon: Image.asset('assets/logo.png', width: 28, height: 28),
+          icon: ClipRRect(
+            borderRadius: BorderRadius.circular(8.0),
+            child: Image.asset('assets/logo.png', width: 28, height: 28),
+          ),
           onPressed: () {
             Scaffold.of(context).openDrawer();
           },
