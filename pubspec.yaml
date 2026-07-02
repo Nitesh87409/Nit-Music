@@ -68,5 +68,13 @@ flutter:
       fonts:
         - asset: assets/fonts/paytone/PaytoneOne-Regular.ttf
 
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/logo.png"
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/logo.png"
+
+
 
 

@@ -132,15 +132,18 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
   PageRoute<void> _createSlideTransition() {
     return PageRouteBuilder<void>(
       pageBuilder: (context, animation, _) => const NowPlayingPage(),
-      transitionDuration: const Duration(milliseconds: 400),
-      reverseTransitionDuration: const Duration(milliseconds: 350),
+      transitionDuration: const Duration(milliseconds: 350),
+      reverseTransitionDuration: const Duration(milliseconds: 300),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        final fadeAnimation = CurvedAnimation(
+        final slideAnimation = Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(
           parent: animation,
           curve: Curves.easeOutCubic,
           reverseCurve: Curves.easeInCubic,
-        );
-        return FadeTransition(opacity: fadeAnimation, child: child);
+        ));
+        return SlideTransition(position: slideAnimation, child: child);
       },
     );
   }

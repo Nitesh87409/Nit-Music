@@ -42,8 +42,13 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     if (item?.artUri == null) return;
     try {
       final palette = await PaletteGenerator.fromImageProvider(
-        NetworkImage(item!.artUri!.toString()),
-        maximumColorCount: 5,
+        ResizeImage(
+          NetworkImage(item!.artUri!.toString()),
+          width: 50,
+          height: 50,
+        ),
+        maximumColorCount: 3,
+        timeout: const Duration(seconds: 3),
       );
       if (mounted) {
         setState(() {

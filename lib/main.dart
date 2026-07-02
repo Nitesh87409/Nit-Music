@@ -148,7 +148,6 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!isFdroidBuild && kReleaseMode && !offlineMode.value) {
         checkAppUpdates();
-        isUpdateChecked = true;
       }
     });
   }

@@ -19,6 +19,10 @@ import 'package:path_provider/path_provider.dart';
 const String checkUrl = 'https://api.github.com/repos/Nitesh87409/Nit-Music/releases/latest';
 
 Future<void> checkAppUpdates() async {
+  // Prevent duplicate update checks in the same session
+  if (isUpdateChecked) return;
+  isUpdateChecked = true;
+
   try {
     final response = await http.get(Uri.parse(checkUrl));
 
@@ -35,19 +39,20 @@ Future<void> checkAppUpdates() async {
     final latestVersion = tagName.replaceAll('v', '');
     announcementURL.value = null; // Removed custom announcement feature
 
+    logger.log(
+      'Update check: installed=$appVersion, latest=$latestVersion',
+    );
+
     if (!isLatestVersionHigher(appVersion, latestVersion)) {
+      logger.log('App is up to date, no update dialog shown.');
       return;
     }
 
     final releasesResponse = map;
 
-
-
     await showDialog(
       context: NavigationManager().context,
       builder: (BuildContext context) {
-        final colorScheme = Theme.of(context).colorScheme;
-
         return _UpdateDialog(
           latestVersion: latestVersion,
           releasesResponse: releasesResponse,
