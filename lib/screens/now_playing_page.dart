@@ -151,15 +151,32 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Row(
         children: [
-          IconButton(
-            iconSize: 24,
-            icon: const Icon(FluentIcons.chevron_down_24_regular),
-            style: IconButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-              shape: const CircleBorder(),
-              padding: const EdgeInsets.all(12),
+          Hero(
+            tag: 'collapse_button',
+            flightShuttleBuilder: (flightContext, animation, flightDirection, fromHeroContext, toHeroContext) {
+              final Widget hero = flightDirection == HeroFlightDirection.push
+                  ? toHeroContext.widget
+                  : fromHeroContext.widget;
+              return AnimatedBuilder(
+                animation: animation,
+                builder: (context, child) {
+                  return Opacity(
+                    opacity: Curves.easeOut.transform(animation.value),
+                    child: hero,
+                  );
+                },
+              );
+            },
+            child: IconButton(
+              iconSize: 24,
+              icon: const Icon(FluentIcons.chevron_down_24_regular),
+              style: IconButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                shape: const CircleBorder(),
+                padding: const EdgeInsets.all(12),
+              ),
+              onPressed: () => Navigator.pop(context),
             ),
-            onPressed: () => Navigator.pop(context),
           ),
         ],
       ),

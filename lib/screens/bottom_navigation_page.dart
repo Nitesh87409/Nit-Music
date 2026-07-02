@@ -44,12 +44,10 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> with Ticker
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 250),
+      upperBound: 10.0, // High enough to cover all tabs
       value: widget.navigationShell.currentIndex.toDouble(),
     );
-    _animation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.fastOutSlowIn,
-    );
+    _animation = _animationController;
   }
 
 
@@ -58,6 +56,22 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> with Ticker
   void dispose() {
     _animationController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(BottomNavigationPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.navigationShell.currentIndex != oldWidget.navigationShell.currentIndex) {
+      final isOffline = offlineMode.value;
+      final items = _getNavigationItems(isOffline);
+      final newIndex = _getCurrentIndex(items, isOffline);
+      _animationController.animateTo(
+        newIndex.toDouble(),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.fastOutSlowIn,
+      );
+      _previousTabIndex = widget.navigationShell.currentIndex;
+    }
   }
 
   @override
@@ -315,22 +329,23 @@ class CustomBottomNavigationBar extends StatelessWidget {
     return Container(
       height: 70,
       color: theme.colorScheme.surface,
-      child: Stack(
-        children: [
-          // The animated pill
-          AnimatedBuilder(
-            animation: animation,
-            builder: (context, child) {
-              // Calculate the alignment based on the continuous animation value
-              // 0 -> -1.0, 1 -> x, items.length - 1 -> 1.0
-              final t = items.length > 1 ? animation.value / (items.length - 1) : 0.0;
-              final alignmentX = -1.0 + (t * 2.0);
-              
-              return Align(
-                alignment: Alignment(alignmentX, 0),
-                child: FractionallySizedBox(
-                  widthFactor: 1.0 / items.length,
-                  child: Center(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final tabWidth = constraints.maxWidth / items.length;
+          
+          return Stack(
+            children: [
+              // The animated pill
+              AnimatedBuilder(
+                animation: animation,
+                builder: (context, child) {
+                  // Center the 64px pill horizontally within the active tab
+                  final leftOffset = animation.value * tabWidth + (tabWidth - 64) / 2;
+                  
+                  return Positioned(
+                    // Vertically position to align perfectly behind the 24px icon
+                    top: 10,
+                    left: leftOffset,
                     child: Container(
                       width: 64,
                       height: 32,
@@ -339,14 +354,12 @@ class CustomBottomNavigationBar extends StatelessWidget {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                  ),
-                ),
-              );
-            },
-          ),
-          
-          // The icons and labels
-          Row(
+                  );
+                },
+              ),
+              
+              // The icons and labels
+              Row(
             children: List.generate(items.length, (index) {
               final item = items[index];
               return Expanded(
@@ -405,6 +418,8 @@ class CustomBottomNavigationBar extends StatelessWidget {
             }),
           ),
         ],
+      );
+        },
       ),
     );
   }

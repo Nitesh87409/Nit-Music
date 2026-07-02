@@ -210,6 +210,14 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
                       ),
                     ),
                   ),
+                  Positioned(
+                    top: 12,
+                    left: 24,
+                    child: Hero(
+                      tag: 'collapse_button',
+                      child: const SizedBox(width: 48, height: 48),
+                    ),
+                  ),
                   Align(
                     alignment: Alignment.center,
                     child: Padding(
