@@ -10,6 +10,8 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart'
     show closeCurrentBottomSheet;
 import 'package:musify/widgets/mini_player.dart';
+import 'package:rxdart/rxdart.dart';
+import 'package:audio_service/audio_service.dart';
 // Global notifier to detect when the Search tab is re-tapped while already active
 final ValueNotifier<int> searchTabReselectNotifier = ValueNotifier(0);
 
@@ -28,9 +30,13 @@ class BottomNavigationPage extends StatefulWidget {
 }
 
 class _BottomNavigationPageState extends State<BottomNavigationPage> with TickerProviderStateMixin {
-  late final _miniPlayerVisibilityStream = audioHandler.mediaItem
-      .map((mediaItem) => mediaItem != null)
-      .distinct();
+  late final _miniPlayerVisibilityStream = Rx.combineLatest2(
+    audioHandler.mediaItem,
+    audioHandler.playbackStateStream,
+    (mediaItem, playbackState) =>
+        mediaItem != null &&
+        playbackState.processingState != AudioProcessingState.idle,
+  ).distinct();
 
   bool? _previousOfflineMode;
 
@@ -137,11 +143,6 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> with Ticker
                           stream: _miniPlayerVisibilityStream,
                           builder: (context, snapshot) {
                             final mediaQuery = MediaQuery.of(context);
-                            final isMiniPlayerVisible = snapshot.data ?? false;
-                            final bottomPadding = !isMiniPlayerVisible
-                                ? mediaQuery.padding.bottom
-                                : mediaQuery.padding.bottom +
-                                      miniPlayerTotalHeight;
 
                             return Stack(
                               alignment: Alignment.bottomCenter,
@@ -149,7 +150,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> with Ticker
                                 MediaQuery(
                                   data: mediaQuery.copyWith(
                                     padding: mediaQuery.padding.copyWith(
-                                      bottom: bottomPadding,
+                                      bottom: mediaQuery.padding.bottom,
                                     ),
                                   ),
                                   child: IndexedStack(

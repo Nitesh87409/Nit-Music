@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:musify/services/router_service.dart';
+import 'package:musify/widgets/mini_player_bottom_space.dart';
 
 bool _isBottomSheetOpen = false;
 
@@ -55,6 +56,7 @@ Future<void> showCustomBottomSheet(
               child: content,
             ),
           ),
+          const MiniPlayerBottomSpace(),
         ],
       ),
     ),

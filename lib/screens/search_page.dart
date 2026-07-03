@@ -78,6 +78,10 @@ class _SearchPageState extends State<SearchPage> {
   int _latestSuggestionRequest = 0;
   int _latestLiveSearchRequest = 0;
 
+  // Search Stack (Industry back navigation)
+  final List<String> _searchStack = [];
+  bool _isHandlingBack = false;
+
   // Search filters
   final List<Map<String, String>> _searchFilters = [
     {'label': 'All', 'value': 'All'},
@@ -215,6 +219,13 @@ class _SearchPageState extends State<SearchPage> {
     }
     _fetchingSongs.value = true;
 
+    if (!_isHandlingBack && query.isNotEmpty) {
+      if (_searchStack.isEmpty || _searchStack.last != query) {
+        _searchStack.add(query);
+      }
+    }
+    _isHandlingBack = false;
+
     if (!searchHistory.contains(query)) {
       final updatedHistory = List.from(searchHistory)..insert(0, query);
       searchHistoryNotifier.value = updatedHistory;
@@ -290,8 +301,33 @@ class _SearchPageState extends State<SearchPage> {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      body: SafeArea(
+    return PopScope(
+      canPop: _searchStack.isEmpty && _suggestionsList.isEmpty && !_inputNode.hasFocus,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+
+        if (_inputNode.hasFocus || _suggestionsList.isNotEmpty) {
+          _inputNode.unfocus();
+          setState(() {
+            _suggestionsList.clear();
+          });
+          return;
+        }
+
+        if (_searchStack.isNotEmpty) {
+          _searchStack.removeLast(); // Remove current search
+          if (_searchStack.isNotEmpty) {
+            _isHandlingBack = true;
+            _searchBar.text = _searchStack.last;
+            search();
+          } else {
+            _searchBar.clear();
+            search();
+          }
+        }
+      },
+      child: Scaffold(
+        body: SafeArea(
         child: GestureDetector(
           onTap: _inputNode.unfocus,
           behavior: HitTestBehavior.translucent,
@@ -403,6 +439,7 @@ class _SearchPageState extends State<SearchPage> {
                 const MiniPlayerBottomSpace(),
               ],
             ),
+          ),
           ),
         ),
       ),

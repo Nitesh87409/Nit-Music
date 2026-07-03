@@ -276,34 +276,37 @@ List _deduplicateAndShuffle(List playlistSongs) {
 /// Returns up to 20 songs. The UI shows the first 4; "Play all" queues all 20.
 Future<List> getQuickPicks() async {
   try {
-    // Pick a seed song from recent history (top 5 most recent)
-    String? seedId;
+    List<String> seedsToTry = [];
     if (userRecentlyPlayed.value.isNotEmpty) {
-      final topRecent = userRecentlyPlayed.value.take(5).toList()..shuffle();
-      seedId = topRecent.first['ytid']?.toString();
+      final topRecent = userRecentlyPlayed.value.take(10).toList()..shuffle();
+      seedsToTry.addAll(topRecent.map((e) => e['ytid']?.toString()).whereType<String>());
     }
 
-    // If no history, use a trending song as seed
-    if (seedId == null || seedId.isEmpty) {
-      final trending = await getTrendingSongs();
-      if (trending.isNotEmpty) {
-        final shuffled = List.from(trending)..shuffle();
-        seedId = shuffled.first['ytid']?.toString();
+    final trending = await getTrendingSongs();
+    if (trending.isNotEmpty) {
+      final shuffled = List.from(trending)..shuffle();
+      seedsToTry.addAll(shuffled.take(5).map((e) => e['ytid']?.toString()).whereType<String>());
+    }
+
+    for (final seedId in seedsToTry) {
+      if (seedId.isEmpty) continue;
+      try {
+        final song = await ytClient.videos.get(seedId);
+        final relatedSongs = await ytClient.videos.getRelatedVideos(song);
+        if (relatedSongs != null && relatedSongs.isNotEmpty) {
+          final results = relatedSongs
+              .where((s) => s.duration != null && s.duration!.inMinutes <= 15)
+              .take(20)
+              .map((s) => returnSongLayout(0, s))
+              .toList();
+          if (results.isNotEmpty) return results;
+        }
+      } catch (e) {
+        // Ignore this specific seed's error and try the next one
+        continue;
       }
     }
-
-    if (seedId == null || seedId.isEmpty) return [];
-
-    final song = await ytClient.videos.get(seedId);
-    final relatedSongs = await ytClient.videos.getRelatedVideos(song) ?? [];
-
-    final results = relatedSongs
-        .where((s) => s.duration != null && s.duration!.inMinutes <= 15)
-        .take(20)
-        .map((s) => returnSongLayout(0, s))
-        .toList();
-
-    return results;
+    return [];
   } catch (e, stackTrace) {
     logger.log('Error in getQuickPicks', error: e, stackTrace: stackTrace);
     return [];
@@ -544,7 +547,24 @@ Future<List<String>> getSearchSuggestions(String query) async {
 
   final suggestions = await ytClient.search.getQuerySuggestions(query);
 
-  return suggestions;
+  final blockedKeywords = [
+    'lyrics',
+    'controversy',
+    'download',
+    'karaoke',
+    'ringtone',
+    'video',
+    'list',
+    'status',
+    'mp3',
+    'audio',
+  ];
+  final filteredSuggestions = suggestions.where((suggestion) {
+    final lower = suggestion.toLowerCase();
+    return !blockedKeywords.any((keyword) => lower.contains(keyword));
+  }).toList();
+
+  return filteredSuggestions;
 }
 
 Future<List<Map<String, int>>> getSkipSegments(String id) async {

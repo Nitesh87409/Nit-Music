@@ -1563,9 +1563,30 @@ class MusifyAudioHandler extends BaseAudioHandler {
     await super.onTaskRemoved();
   }
 
+  bool _isFadingOut = false;
+
+  Future<void> _fadeOut() async {
+    if (_isFadingOut) return;
+    _isFadingOut = true;
+    final originalVolume = audioPlayer.volume;
+    if (originalVolume > 0) {
+      for (int i = 10; i >= 0; i--) {
+        if (!_isFadingOut) break;
+        await audioPlayer.setVolume(originalVolume * (i / 10));
+        await Future.delayed(const Duration(milliseconds: 30));
+      }
+    }
+  }
+
+  void _resetVolume() {
+    _isFadingOut = false;
+    audioPlayer.setVolume(1.0);
+  }
+
   @override
   Future<void> play() async {
     try {
+      _resetVolume();
       if (audioPlayer.audioSource == null) {
         final recentSong = _latestResumableSong();
         if (recentSong != null) {
@@ -1600,7 +1621,9 @@ class MusifyAudioHandler extends BaseAudioHandler {
         wasPlaying: audioPlayer.playing,
       );
       unawaited(listeningStatsService.flush());
+      await _fadeOut();
       await audioPlayer.pause();
+      _resetVolume();
     } catch (e, stackTrace) {
       logger.log('Error in pause()', error: e, stackTrace: stackTrace);
     }
@@ -1619,7 +1642,9 @@ class MusifyAudioHandler extends BaseAudioHandler {
         countCurrentTick: true,
         wasPlaying: audioPlayer.playing,
       );
+      await _fadeOut();
       await audioPlayer.stop();
+      _resetVolume();
       _resetPreloadingState();
     } catch (e, stackTrace) {
       logger.log('Error in stop()', error: e, stackTrace: stackTrace);

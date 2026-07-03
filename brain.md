@@ -66,3 +66,42 @@ This file keeps track of all the changes and updates made to this personal music
   - *Smart Pipe Stripping:* Changed the pipe (`|`) logic to strip emojis and hashtags *before* splitting by pipe, ensuring that valid song names aren't discarded when preceded by a hashtag (e.g., `#Video | Song Name`).
   - *Artist Prefix Truncation:* Modified `formatSongTitle` to accept an `author` parameter. If a YouTube title starts with the channel/artist name followed by a colon or dash (e.g., `Singer Name : Song Name`), the prefix is automatically stripped so the actual song name is clearly visible in the UI without being truncated by an ellipsis.
   - *Unit Tests Added:* Wrote additional regression tests in `test/formatter_test.dart` to strictly verify these new title configurations.
+- **Search Navigation Back-Stack (v10.1.45 Update):** Implemented an industry-standard navigation back-stack for the Search Page in `lib/screens/search_page.dart`.
+  - *PopScope Integration:* Wrapped the `Scaffold` in a `PopScope` to intercept hardware back button presses.
+  - *Search History Stack:* Added a `_searchStack` list to maintain the history of searches in the current session. When the back button is pressed, the app now pops the current search query and re-triggers the previous search query instead of instantly exiting the app or returning to the home screen.
+- **UI Bug Fix (v10.1.46 Update):** Fixed a layout issue where the MiniPlayer would overlay and hide the bottom items of `ModalBottomSheet` widgets across the app (like Settings -> Audio Quality).
+  - *Global Padding Fix:* Added `MiniPlayerBottomSpace()` to the bottom of the `Column` inside `showCustomBottomSheet` in `lib/utilities/flutter_bottom_sheet.dart` to automatically pad bottom sheets by the height of the mini player globally.
+- **Search Suggestions Filter (v10.1.48 Update):** Improved search accuracy by filtering out irrelevant suggestions fetched from YouTube.
+  - *Keyword Filtering:* Added logic in `getSearchSuggestions` (`lib/services/common_services.dart`) to block suggestions containing keywords like `lyrics`, `controversy`, `download`, `karaoke`, `ringtone`, `video`, `list`, `status`, `mp3`, and `audio`. This ensures users primarily see song and artist-related recommendations.
+- **Like Button Animation & Color Fix (v10.1.50 Update):** Improved the visual feedback of the Like (Heart) button across the app (including Home Page).
+  - *Global Component:* Extracted the animation logic into a new reusable `AnimatedLikeButton` widget (`lib/widgets/animated_like_button.dart`).
+  - *Heartbeat Animation:* Implemented `SingleTickerProviderStateMixin` with an `AnimationController` and a bouncy `ScaleTransition`. When a user likes a song, the heart icon performs a heartbeat scale animation (`Curves.easeOutBack` into `Curves.elasticOut`).
+  - *Color Update:* Changed the active like color from the default theme accent color to `Colors.redAccent` for a more natural, "heart-like" aesthetic.
+  - *Home Page Integration:* Replaced the non-functional dummy `IconButton` in `home_page.dart`'s recommended songs list with the new `AnimatedLikeButton`.
+- **Liked Songs Database Fix (v10.1.51 Update):** Fixed an issue where liking a song from the Home Page didn't save it to the "Liked Songs" section.
+  - *Data Formatting:* Added logic in `home_page.dart` to inject the `ytid` field into `songData` before passing it to `AnimatedLikeButton`. This ensures `_resolveSongForLikedStatus` successfully parses and saves the song locally without dropping the event.
+- **Like Button State Fix (v10.1.52 Update):** Resolved an issue where liking one recommended song on the Home Page would visually trigger all other recommended songs' like buttons simultaneously.
+  - *ID Resolution Conflict:* The bug occurred because songs coming from the Home Page API only had an `id` field initially, but some API instances returned a missing `id`, causing multiple items to share the `null` identifier.
+  - *Fallback Logic:* Implemented robust fallback logic in `AnimatedLikeButton` instantiation `(song['ytid'] ?? song['id'] ?? '').toString()` to ensure every song gets a unique valid ID, isolating their like states.
+- **Home Page 3-Dot Menu Fix (v10.1.53 Update):** Activated the 3-dot options menu for recommended songs on the Home Page.
+  - *OverflowMenuButton:* Replaced the non-functional dummy `IconButton` with a fully functional `OverflowMenuButton`.
+  - *Actions Added:* Users can now click the 3 dots to "Play Next", "Add to Queue", and "Go to Artist" directly from the Home Page.
+- **Mini Player Swipe-to-Dismiss (v10.1.54 Update):** Added the ability to swipe the mini player away to stop playback.
+  - *Stop Action:* Configured `onDismissed` to trigger `audioHandler.stop()`, mirroring industry-standard music app behaviors like Spotify.
+- **Mini Player Restore Bug Fix (v10.1.55 Update):** Resolved an issue where swiping the mini player away caused it to permanently disappear for subsequent songs until app restart.
+  - *State Reset:* Added an internal `_isDismissed` state flag to track the swipe status.
+  - *Automatic Re-initialization:* The flag is reset to `false` in `didUpdateWidget` whenever a new song is played or the play state toggles, forcing the `Dismissible` widget to successfully rebuild and reappear in the widget tree.
+- **Mini Player Blank Space Padding Fix (v10.1.56 Update):** Removed the persistent black space (padding) left behind at the bottom of the screen when the mini player was swiped away.
+  - *Visibility Sync:* Integrated `audioHandler.playbackStateStream` into `_miniPlayerVisibilityStream` via `Rx.combineLatest2`.
+  - *Dynamic Padding:* The layout's bottom padding now dynamically collapses to `0` whenever `playbackState.processingState == AudioProcessingState.idle`, effectively removing the reserved empty space when playback is fully stopped.
+- **Mini Player True Floating & Down Swipe (v10.1.57 Update):** Completely removed layout padding for the mini player so it floats directly over content, and added a swipe-down gesture.
+  - *Float Fix:* Removed the dynamic padding calculation in `bottom_navigation_page.dart` completely. The background UI now extends all the way down, and the mini player acts as a true overlay.
+  - *Down Swipe:* Updated `_handleVerticalDrag` in `mini_player.dart` to trigger `audioHandler.stop()` and `_isDismissed = true` on positive (downward) vertical swipes, in addition to the horizontal swipe.
+  - *Down Swipe Animation (v10.1.60 Update):* Added a smooth 300ms downward sliding animation using `AnimatedSlide` that visually moves the mini player off-screen before stopping the audio, matching the native feel of the horizontal swipe.
+- **Audio Fade-Out on Pause/Stop (v10.1.58 Update):** Added a premium, smooth fade-out audio effect whenever playback is stopped or paused from anywhere in the app.
+  - *Fade Logic:* Implemented a private `_fadeOut()` async method in `audio_service.dart` that smoothly decrements the volume to zero over a 300ms duration (10 steps of 30ms each).
+  - *Global Integration:* Integrated the fade-out seamlessly into both the `pause()` and `stop()` methods of `MusifyAudioHandler`. 
+  - *Volume Reset:* Added a `_resetVolume()` utility that instantly restores the volume to `1.0` right after the player enters the paused/stopped state (and whenever playback restarts), ensuring subsequent plays start at full volume without delay.
+- **Quick Picks Visibility Fix (v10.1.59 Update):** Fixed an issue where the "Quick picks" section (Quick Play) would completely disappear from the Home Page if the API failed to fetch related songs for a specific song in history.
+  - *Robust Seed Fetching:* Updated `getQuickPicks()` in `common_services.dart` to collect a combined pool of up to 15 seed songs (from local history and trending).
+  - *Fallback Loop:* Implemented a fallback loop that tries to fetch related videos for each seed song one by one. If one throws an error (e.g., due to an API change or unsupported video format), it gracefully catches the error and tries the next seed song instead of returning an empty list.

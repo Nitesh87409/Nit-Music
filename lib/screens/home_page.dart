@@ -10,9 +10,13 @@ import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/async_loader.dart';
+import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
+import 'package:musify/services/router_service.dart';
+import 'package:musify/widgets/animated_like_button.dart';
 import 'package:musify/widgets/announcement_box.dart';
 import 'package:musify/widgets/listening_recap_card.dart';
+import 'package:musify/widgets/overflow_menu_button.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_cube.dart';
 import 'package:musify/widgets/section_header.dart';
@@ -994,13 +998,69 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
             ),
-            IconButton(
-              icon: const Icon(FluentIcons.heart_24_regular, color: Color(0xFFA67CFF)),
-              onPressed: () {},
+            AnimatedLikeButton(
+              audioId: (song['ytid'] ?? song['id'] ?? '').toString(),
+              songData: {
+                ...Map<String, dynamic>.from(song as Map),
+                'ytid': (song['ytid'] ?? song['id'] ?? '').toString(),
+              },
+              size: 24,
             ),
-            IconButton(
-              icon: const Icon(FluentIcons.more_vertical_24_regular, color: Colors.grey),
-              onPressed: () {},
+            OverflowMenuButton<String>(
+              onSelected: (value) async {
+                switch (value) {
+                  case 'play_next':
+                    await audioHandler.playNext(song);
+                    if (context.mounted) showToast(context, context.l10n!.songAdded);
+                    break;
+                  case 'add_to_queue':
+                    await audioHandler.addToQueue(song);
+                    if (context.mounted) showToast(context, context.l10n!.songAdded);
+                    break;
+                  case 'go_to_artist':
+                    final artistName = song['artist']?.toString().trim() ?? '';
+                    if (artistName.isNotEmpty && context.mounted) {
+                      context.push(
+                        '${NavigationManager.searchPath}/artist/${Uri.encodeComponent(artistName)}',
+                        extra: {'title': artistName, 'ytid': artistName},
+                      );
+                    }
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'play_next',
+                  child: Row(
+                    children: [
+                      Icon(FluentIcons.receipt_play_24_regular, color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text(context.l10n!.playNext, style: TextStyle(color: Theme.of(context).colorScheme.secondary)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'add_to_queue',
+                  child: Row(
+                    children: [
+                      Icon(FluentIcons.text_bullet_list_add_24_regular, color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text(context.l10n!.addToQueue, style: TextStyle(color: Theme.of(context).colorScheme.secondary)),
+                    ],
+                  ),
+                ),
+                if ((song['artist']?.toString().trim() ?? '').isNotEmpty)
+                  PopupMenuItem(
+                    value: 'go_to_artist',
+                    child: Row(
+                      children: [
+                        Icon(FluentIcons.person_24_regular, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Text(context.l10n!.goToArtist, style: TextStyle(color: Theme.of(context).colorScheme.secondary)),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ],
         ),

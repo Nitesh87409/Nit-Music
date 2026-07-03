@@ -115,12 +115,20 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
 
   Color? _dominantColor;
   Color? _vibrantColor;
+  bool _isDismissed = false;
+  Offset _slideOffset = Offset.zero;
 
   @override
   void didUpdateWidget(covariant _MiniPlayerBody oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.metadata.id != oldWidget.metadata.id) {
       _updatePaletteIfNeeded();
+      _isDismissed = false;
+      _slideOffset = Offset.zero;
+    }
+    if (widget.state.playbackState.playing && !oldWidget.state.playbackState.playing) {
+      _isDismissed = false;
+      _slideOffset = Offset.zero;
     }
   }
 
@@ -159,6 +167,12 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
   void _handleVerticalDrag(DragUpdateDetails details) {
     if ((details.primaryDelta ?? 0) < -_dragThresholdForNavigation) {
       _navigateToNowPlaying();
+    } else if ((details.primaryDelta ?? 0) > _dragThresholdForNavigation) {
+      setState(() => _slideOffset = const Offset(0, 1.5));
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) setState(() => _isDismissed = true);
+        audioHandler.stop();
+      });
     }
   }
 
@@ -187,6 +201,8 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
 
   @override
   Widget build(BuildContext context) {
+    if (_isDismissed) return const SizedBox.shrink();
+
     final defaultColorScheme = widget.colorScheme;
     final metadata = widget.metadata;
     final state = widget.state;
@@ -213,11 +229,22 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
                   totalDuration.inMilliseconds)
               .clamp(0.0, 1.0);
 
-    return AnimatedBuilder(
-      animation: _scaleAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _scaleAnimation.value,
+    return AnimatedSlide(
+      offset: _slideOffset,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInCubic,
+      child: Dismissible(
+        key: const Key('mini_player_dismiss'),
+        direction: DismissDirection.horizontal,
+        onDismissed: (_) {
+          setState(() => _isDismissed = true);
+          audioHandler.stop();
+        },
+        child: AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _scaleAnimation.value,
           child: GestureDetector(
             onTapDown: (_) => _animationController.forward(),
             onTapUp: (_) => _animationController.reverse(),
@@ -324,7 +351,7 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
           ),
         );
       },
-    );
+    )));
   }
 }
 

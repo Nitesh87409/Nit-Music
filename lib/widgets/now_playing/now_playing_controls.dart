@@ -518,14 +518,25 @@ class _LikeButton extends StatefulWidget {
   State<_LikeButton> createState() => _LikeButtonState();
 }
 
-class _LikeButtonState extends State<_LikeButton> {
+class _LikeButtonState extends State<_LikeButton> with SingleTickerProviderStateMixin {
   late final ValueNotifier<bool> _songLikeStatus;
+  late final AnimationController _controller;
+  late final Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
     _songLikeStatus = ValueNotifier<bool>(isSongAlreadyLiked(widget.audioId));
     userLikedSongsList.addListener(_syncLikeStatus);
+    
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.35).chain(CurveTween(curve: Curves.easeOutBack)), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: 1.35, end: 1.0).chain(CurveTween(curve: Curves.elasticOut)), weight: 50),
+    ]).animate(_controller);
   }
 
   void _syncLikeStatus() {
@@ -547,6 +558,7 @@ class _LikeButtonState extends State<_LikeButton> {
   void dispose() {
     userLikedSongsList.removeListener(_syncLikeStatus);
     _songLikeStatus.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -556,12 +568,18 @@ class _LikeButtonState extends State<_LikeButton> {
       valueListenable: _songLikeStatus,
       builder: (_, isActive, __) {
         return IconButton(
-          icon: Icon(
-            isActive ? FluentIcons.heart_24_filled : FluentIcons.heart_24_regular,
-            color: isActive ? const Color(0xFF8B5CF6) : Theme.of(context).colorScheme.onSurfaceVariant,
+          icon: ScaleTransition(
+            scale: _scaleAnimation,
+            child: Icon(
+              isActive ? FluentIcons.heart_24_filled : FluentIcons.heart_24_regular,
+              color: isActive ? Colors.redAccent : Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           iconSize: 28,
           onPressed: () {
+            if (!isActive) {
+              _controller.forward(from: 0.0);
+            }
             updateSongLikeStatus(
               widget.audioId,
               !_songLikeStatus.value,
