@@ -173,6 +173,39 @@ class SettingsPage extends StatelessWidget {
             );
           },
         ),
+        ValueListenableBuilder<bool>(
+          valueListenable: shakeToSkipEnabled,
+          builder: (_, enabled, __) {
+            return Column(
+              children: [
+                CustomBar(
+                  'Shake to Skip',
+                  FluentIcons.phone_shake_24_regular,
+                  description: 'Shake phone to skip to next/previous song',
+                  trailing: Switch(
+                    value: enabled,
+                    onChanged: (value) => _toggleShakeToSkip(context, value),
+                  ),
+                ),
+                if (enabled)
+                  ValueListenableBuilder<String>(
+                    valueListenable: shakeToSkipSensitivity,
+                    builder: (_, sensitivity, __) {
+                      String displaySens = 'Medium';
+                      if (sensitivity == 'low') displaySens = 'Low (Hard Shake)';
+                      if (sensitivity == 'high') displaySens = 'High (Light Shake)';
+                      return CustomBar(
+                        'Shake Sensitivity',
+                        FluentIcons.settings_24_regular,
+                        description: 'Current: $displaySens',
+                        onTap: () => _showShakeSensitivityPicker(context),
+                      );
+                    },
+                  ),
+              ],
+            );
+          },
+        ),
         if (!isFdroidBuild)
           ValueListenableBuilder<bool>(
             valueListenable: shouldWeCheckUpdates,
@@ -662,6 +695,53 @@ class SettingsPage extends StatelessWidget {
     addOrUpdateData<bool>('settings', 'playNextSongAutomatically', value);
     playNextSongAutomatically.value = value;
     showToast(context, context.l10n!.settingChangedMsg);
+  }
+
+  void _toggleShakeToSkip(BuildContext context, bool value) {
+    addOrUpdateData<bool>('settings', 'shakeToSkipEnabled', value);
+    shakeToSkipEnabled.value = value;
+    showToast(context, context.l10n!.settingChangedMsg);
+  }
+
+  void _showShakeSensitivityPicker(BuildContext context) {
+    showCustomBottomSheet(
+      context,
+      ListView(
+        shrinkWrap: true,
+        children: [
+          RadioListTile<String>(
+            title: const Text('Low (Hard Shake)'),
+            value: 'low',
+            groupValue: shakeToSkipSensitivity.value,
+            onChanged: (value) {
+              addOrUpdateData<String>('settings', 'shakeToSkipSensitivity', value!);
+              shakeToSkipSensitivity.value = value;
+              Navigator.pop(context);
+            },
+          ),
+          RadioListTile<String>(
+            title: const Text('Medium (Normal)'),
+            value: 'medium',
+            groupValue: shakeToSkipSensitivity.value,
+            onChanged: (value) {
+              addOrUpdateData<String>('settings', 'shakeToSkipSensitivity', value!);
+              shakeToSkipSensitivity.value = value;
+              Navigator.pop(context);
+            },
+          ),
+          RadioListTile<String>(
+            title: const Text('High (Light Shake)'),
+            value: 'high',
+            groupValue: shakeToSkipSensitivity.value,
+            onChanged: (value) {
+              addOrUpdateData<String>('settings', 'shakeToSkipSensitivity', value!);
+              shakeToSkipSensitivity.value = value;
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   void _toggleAutomaticUpdateChecks(BuildContext context, bool value) {

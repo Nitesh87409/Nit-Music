@@ -15,6 +15,14 @@ final playNextSongAutomatically = ValueNotifier<bool>(
   Hive.box('settings').get('playNextSongAutomatically', defaultValue: true),
 );
 
+final shakeToSkipEnabled = ValueNotifier<bool>(
+  Hive.box('settings').get('shakeToSkipEnabled', defaultValue: false),
+);
+
+final shakeToSkipSensitivity = ValueNotifier<String>(
+  Hive.box('settings').get('shakeToSkipSensitivity', defaultValue: 'medium'),
+);
+
 final useSystemColor = ValueNotifier<bool>(
   Hive.box('settings').get('useSystemColor', defaultValue: true),
 );

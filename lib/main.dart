@@ -20,6 +20,7 @@ import 'package:musify/services/playlist_sharing.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/services/shake_service.dart';
 import 'package:musify/services/update_manager.dart';
 import 'package:musify/theme/app_themes.dart';
 import 'package:musify/utilities/flutter_toast.dart';
@@ -256,6 +257,9 @@ Future<void> initialisation() async {
         androidStopForegroundOnPause: false,
       ),
     );
+
+    // Initialize Shake Service
+    ShakeService().init();
 
     // Init router
     NavigationManager.instance;

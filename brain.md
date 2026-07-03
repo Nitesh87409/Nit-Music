@@ -106,3 +106,39 @@ This file keeps track of all the changes and updates made to this personal music
 - **Quick Picks Visibility Fix (v10.1.59 Update):** Fixed an issue where the "Quick picks" section (Quick Play) would completely disappear from the Home Page if the API failed to fetch related songs for a specific song in history.
   - *Robust Seed Fetching:* Updated `getQuickPicks()` in `common_services.dart` to collect a combined pool of up to 15 seed songs (from local history and trending).
   - *Fallback Loop:* Implemented a fallback loop that tries to fetch related videos for each seed song one by one. If one throws an error (e.g., due to an API change or unsupported video format), it gracefully catches the error and tries the next seed song instead of returning an empty list.
+- **Shake to Skip Feature (v10.1.61 Update):** Implemented a complete motion-based gesture system that allows users to skip tracks by physically shaking their device. This is an industry-standard implementation with battery optimization and user-configurable settings.
+  - **Dependency Installed:** Added `sensors_plus: ^7.1.0` in `pubspec.yaml` to gain access to the device's accelerometer sensors.
+  - **Core Logic (`lib/services/shake_service.dart`):**
+    - Created a singleton class `ShakeService` to centralize all motion detection logic.
+    - Used `userAccelerometerEventStream(samplingPeriod: SensorInterval.gameInterval)` to listen to `UserAccelerometerEvent`. We used `userAccelerometer` instead of standard `accelerometer` to exclude the force of gravity and only capture the user's actual physical movements.
+    - Added a magnitude calculation: `sqrt(x² + y² + z²)`. If the magnitude exceeds a specific threshold, a "shake" is registered.
+    - **Events & Timing Logic:**
+      - Added a 250ms debounce (`_lastShakeTime`) so the forward and backward motion of a single physical shake aren't counted as two separate shakes.
+      - Implemented a **500ms Time-Window (`_singleShakeTimer`)**:
+        - If `_shakeCount == 1` after 500ms, it triggers `audioHandler.skipToNext()`.
+        - If a second shake occurs within that 500ms (`_shakeCount == 2`), the timer is canceled, and it immediately triggers `audioHandler.skipToPrevious()`.
+      - **Cooldown (`_cooldownTimer`):** After any skip action is triggered, a 1.5-second cooldown locks the sensor. This prevents accidental rapid-fire skips.
+      - **Haptic Feedback:** Used `HapticFeedback.mediumImpact()` to give the user a physical confirmation when a skip is triggered.
+    - **Battery Optimization:** The stream listener explicitly checks `audioHandler.playbackState.value.processingState` and `playing`. If music is paused or idle, it returns immediately without doing math, saving battery life.
+  - **Settings Integration (`lib/services/settings_manager.dart` & `lib/screens/settings_page.dart`):**
+    - Added two new `ValueNotifier` states backed by Hive: `shakeToSkipEnabled` (default: false) and `shakeToSkipSensitivity` (default: 'medium').
+    - Added a new UI block in `_buildPreferencesSection` of `settings_page.dart` (right after offline mode).
+    - It contains a Master Toggle (Switch) and, if enabled, dynamically shows a "Shake Sensitivity" picker.
+    - The sensitivity picker (`_showShakeSensitivityPicker`) is a Bottom Sheet with a `RadioListTile` offering three thresholds:
+      - Low (Hard Shake): Threshold 25.0
+      - Medium (Normal): Threshold 18.0
+      - High (Light Shake): Threshold 12.0
+  - **App Initialization (`lib/main.dart`):**
+    - Imported `shake_service.dart` and called `ShakeService().init();` immediately after the `AudioService.init` block in `main()`, ensuring the listener is ready as soon as the app starts.
+- **Shake to Skip Hardware False-Positive Fix (v10.1.62 Update):** Completely rewrote the shake logic to use an absolute "Orientation/Flat Lock" because Android's `userAccelerometer` produced fake acceleration spikes when the device was suddenly stopped (placed on a table/bed).
+  - *Swapped Sensor:* Moved from `userAccelerometerEventStream` to `accelerometerEventStream` (which includes raw gravity).
+  - *Custom Gravity HPF:* Implemented a manual high-pass filter (`alpha = 0.8`) to mathematically separate gravity from true linear acceleration without relying on the OS's delayed filter.
+  - *Flat Lock Logic:* Added a critical check: `if (event.z.abs() > 7.5 || _gravityZ.abs() > 7.5) { return; }`. If the phone is lying flat on a table or bed (Z-axis gravity dominates), the entire shake system is temporarily disabled.
+  - *Z-Axis Blindness & Shock Lock (Final Iteration):* Calculated magnitude using only X and Y (`sqrt(linearX*linearX + linearY*linearY)`) to blind the sensor to Z-axis drops (bed impacts). Added a 1000ms `_flatLockUntil` freeze when vertical shock `event.z > 12.0` occurs. 
+  - **CURRENT STATUS (PAUSED):** Despite the above fixes, the logic performed flawlessly in `Debug` builds (due to slower event loop processing or Dart VM overhead) but continued to register false-positives upon bed impact in the `Release` build (which processes at 20ms `gameInterval` speeds, catching micro-bounces). 
+  - **History of Attempted Fixes (For future reference):**
+    1. *Cross-Axis Rejection:* Blocked triggers if Z/Y were higher than X. Failed because bed-bounce forces are chaotic across all axes.
+    2. *Magnitude Low-Pass Filter:* Averaged the magnitude to smooth out spikes. Failed because multi-directional bounce energy collapsed into a single massive positive signal.
+    3. *Axis-Specific LPF:* Filtered axes individually before calculating magnitude. Failed because OS-level sensor lag created synthetic acceleration on sudden stops.
+    4. *Orientation/Gravity Lock:* Checked `event.z > 7.5` to disable if flat. Failed in Release mode because the impact bounce momentarily drops Z gravity below 7.5, opening the lock.
+    5. *Z-Blindness & Shock Lock:* Ignored Z entirely for magnitude and froze sensor for 1 sec on impact. Still registered false-positives in Release mode (likely due to phone bouncing sideways (X/Y) on mattress springs or polling interval missing the exact frame of the lock). Work paused for now.
