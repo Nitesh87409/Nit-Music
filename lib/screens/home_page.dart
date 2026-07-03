@@ -16,6 +16,8 @@ import 'package:musify/widgets/listening_recap_card.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_cube.dart';
 import 'package:musify/widgets/section_header.dart';
+import 'package:musify/widgets/spinner.dart';
+import 'package:musify/widgets/skeleton_loader.dart';
 import 'package:musify/widgets/song_bar.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
@@ -295,8 +297,45 @@ class _HomePageState extends State<HomePage> {
   Widget _buildSuggestedPlaylists(double playlistHeight) {
     return AsyncLoader<List<dynamic>>(
       future: _suggestedPlaylistsFuture,
+      loadingWidget: _buildSuggestedPlaylistsSkeleton(),
       builder: (context, playlists) =>
           _buildSuggestedPlaylistsSection(playlistHeight, playlists),
+    );
+  }
+
+  Widget _buildSuggestedPlaylistsSkeleton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Your top mixes',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 200,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: 4,
+            itemBuilder: (context, index) {
+              return const Padding(
+                padding: EdgeInsets.only(right: 16),
+                child: MixCardSkeleton(),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -437,6 +476,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildTrendingSection() {
     return AsyncLoader<List<dynamic>>(
       future: _trendingSongsFuture,
+      loadingWidget: _buildTrendingSectionSkeleton(),
       builder: (context, data) {
         if (data.isEmpty) return const SizedBox.shrink();
         return Column(
@@ -552,13 +592,86 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildTrendingSectionSkeleton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Trending Now ',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text('🔥', style: TextStyle(fontSize: 20)),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 200,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: 4,
+            itemBuilder: (context, index) {
+              return const Padding(
+                padding: EdgeInsets.only(right: 16),
+                child: MixCardSkeleton(),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildRecommendedSongsSection() {
     return AsyncLoader<List<dynamic>>(
       future: _recommendedSongsFuture,
+      loadingWidget: _buildRecommendedSongsSkeleton(),
       builder: (context, data) {
         if (data.isEmpty) return const SizedBox.shrink();
         return _buildRecommendedForYouSection(context, data);
       },
+    );
+  }
+
+  Widget _buildRecommendedSongsSkeleton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Recommended for you',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+        const SizedBox(height: 16),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 4,
+          padding: EdgeInsets.zero,
+          itemBuilder: (context, index) {
+            return const SongBarSkeleton();
+          },
+        ),
+      ],
     );
   }
 

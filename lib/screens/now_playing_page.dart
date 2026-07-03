@@ -86,8 +86,8 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    _vibrantColor?.withValues(alpha: 0.6) ?? colorScheme.surface,
-                    _dominantColor?.withValues(alpha: 0.8) ?? colorScheme.surface,
+                    _vibrantColor?.withValues(alpha: 0.3) ?? colorScheme.surface,
+                    _dominantColor?.withValues(alpha: 0.5) ?? colorScheme.surface,
                     colorScheme.surface,
                   ],
                   stops: const [0.0, 0.4, 1.0],
@@ -107,11 +107,9 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                     final backgroundColor = _vibrantColor ?? _dominantColor ?? colorScheme.surface;
                     final isDark = ThemeData.estimateBrightnessForColor(backgroundColor) == Brightness.dark;
                     
+                    // Always use default (white) onSurface for readability, only change primary
                     final dynamicColorScheme = colorScheme.copyWith(
-                      onSurface: isDark ? Colors.white : Colors.black87,
-                      onSurfaceVariant: isDark ? Colors.white70 : Colors.black54,
                       primary: isDark ? const Color(0xFFB490FF) : const Color(0xFF7C3AED),
-                      surfaceContainerHighest: isDark ? Colors.white24 : Colors.black12,
                     );
 
                     return GestureDetector(

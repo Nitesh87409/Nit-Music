@@ -10,6 +10,8 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart'
     show closeCurrentBottomSheet;
 import 'package:musify/widgets/mini_player.dart';
+// Global notifier to detect when the Search tab is re-tapped while already active
+final ValueNotifier<int> searchTabReselectNotifier = ValueNotifier(0);
 
 class BottomNavigationPage extends StatefulWidget {
   const BottomNavigationPage({
@@ -262,6 +264,9 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> with Ticker
       // If user taps the same tab again, reset it to initial state.
       // Otherwise, preserve the branch state.
       if (isReselect) {
+        if (item.route == '/search') {
+          searchTabReselectNotifier.value++;
+        }
         widget.navigationShell.goBranch(item.shellIndex, initialLocation: true);
       } else {
         widget.navigationShell.goBranch(item.shellIndex);

@@ -12,6 +12,8 @@ import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/services/search_recommendation_service.dart';
+import 'package:musify/screens/bottom_navigation_page.dart';
+import 'package:musify/widgets/skeleton_loader.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/widgets/artist_bar.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
@@ -61,7 +63,10 @@ const List<Map<String, String>> _moodChips = [
 class _SearchPageState extends State<SearchPage> {
   final TextEditingController _searchBar = TextEditingController();
   final FocusNode _inputNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
   final ValueNotifier<bool> _fetchingSongs = ValueNotifier(false);
+  bool _isLoadingMoreSongs = false;
+  dynamic _songsNextPage;
   int maxSongsInList = 15;
   List<dynamic> _songsSearchResult = [];
   List<Map<String, dynamic>> _artistsSearchResult = [];
@@ -72,6 +77,16 @@ class _SearchPageState extends State<SearchPage> {
   Timer? _liveSearchDebounce;
   int _latestSuggestionRequest = 0;
   int _latestLiveSearchRequest = 0;
+
+  // Search filters
+  final List<Map<String, String>> _searchFilters = [
+    {'label': 'All', 'value': 'All'},
+    {'label': '🎵 Songs', 'value': 'Songs'},
+    {'label': '👤 Artists', 'value': 'Artists'},
+    {'label': '💿 Albums', 'value': 'Albums'},
+    {'label': '▶️ Playlists', 'value': 'Playlists'},
+  ];
+  String _activeFilter = 'All';
 
   // Smart recommendations
   List<dynamic> _recommendations = [];
@@ -84,7 +99,48 @@ class _SearchPageState extends State<SearchPage> {
   void initState() {
     super.initState();
     _inputNode.addListener(_onFocusChange);
+    _scrollController.addListener(_onScroll);
+    searchTabReselectNotifier.addListener(_onReselectTab);
     _loadRecommendations();
+  }
+
+  void _onReselectTab() {
+    if (mounted) {
+      _searchBar.clear();
+      setState(() {
+        _songsSearchResult.clear();
+        _artistsSearchResult.clear();
+        _albumsSearchResult.clear();
+        _playlistsSearchResult.clear();
+        _suggestionsList.clear();
+        _activeFilter = 'All';
+      });
+      _inputNode.unfocus();
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreSongs();
+    }
+  }
+
+  Future<void> _loadMoreSongs() async {
+    if (_isLoadingMoreSongs || _songsNextPage == null || _activeFilter != 'Songs') return;
+    
+    setState(() {
+      _isLoadingMoreSongs = true;
+    });
+    
+    final results = await fetchNextSongsList(_songsNextPage);
+    
+    if (mounted) {
+      setState(() {
+        _songsSearchResult.addAll(results['songs'] ?? []);
+        _songsNextPage = results['nextPage'];
+        _isLoadingMoreSongs = false;
+      });
+    }
   }
 
   void _onFocusChange() {
@@ -132,7 +188,10 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
+    searchTabReselectNotifier.removeListener(_onReselectTab);
     _inputNode.removeListener(_onFocusChange);
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _searchBar.dispose();
     _inputNode.dispose();
     _fetchingSongs.dispose();
@@ -150,6 +209,7 @@ class _SearchPageState extends State<SearchPage> {
       _albumsSearchResult = [];
       _playlistsSearchResult = [];
       _suggestionsList = [];
+      _activeFilter = 'All'; // Reset filter when search is cleared
       if (mounted) setState(() {});
       return;
     }
@@ -165,19 +225,22 @@ class _SearchPageState extends State<SearchPage> {
     unawaited(updateSearchFrequency(query));
 
     try {
-      final results = await Future.wait<List<dynamic>>([
-        fetchSongsList(query).timeout(const Duration(seconds: 8), onTimeout: () => []),
-        searchArtists(query).timeout(const Duration(seconds: 2), onTimeout: () => []),
-        getPlaylists(query: query, type: 'album').timeout(const Duration(seconds: 2), onTimeout: () => []),
-        getPlaylists(query: query, type: 'playlist').timeout(const Duration(seconds: 2), onTimeout: () => []),
+      final results = await Future.wait<dynamic>([
+        fetchSongsListWithPagination(query).timeout(const Duration(seconds: 8), onTimeout: () => {'songs': <dynamic>[], 'nextPage': null}),
+        searchArtists(query).timeout(const Duration(seconds: 2), onTimeout: () => <Map<String, dynamic>>[]),
+        getPlaylists(query: query, type: 'album').timeout(const Duration(seconds: 2), onTimeout: () => <dynamic>[]),
+        getPlaylists(query: query, type: 'playlist').timeout(const Duration(seconds: 2), onTimeout: () => <dynamic>[]),
       ]);
 
       if (requestId != null && requestId != _latestLiveSearchRequest) {
         return; // Ignore results if a newer request was made
       }
 
-      _songsSearchResult = results[0];
-      _artistsSearchResult = results[1]
+      final songData = results[0] as Map<String, dynamic>;
+      _songsSearchResult = List<dynamic>.from(songData['songs'] ?? []);
+      _songsNextPage = songData['nextPage'];
+      
+      _artistsSearchResult = (results[1] as List)
           .whereType<Map>()
           .map(Map<String, dynamic>.from)
           .toList();
@@ -233,6 +296,7 @@ class _SearchPageState extends State<SearchPage> {
           onTap: _inputNode.unfocus,
           behavior: HitTestBehavior.translucent,
           child: SingleChildScrollView(
+            controller: _scrollController,
             padding: commonSingleChildScrollViewPadding,
             child: Column(
               children: <Widget>[
@@ -326,6 +390,8 @@ class _SearchPageState extends State<SearchPage> {
                           key: ValueKey('search-active-${_searchBar.text}'),
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (_hasSearchResults || _searchBar.text.isNotEmpty)
+                              _buildSearchFilters(colorScheme),
                             if (_suggestionsList.isNotEmpty)
                               _buildSuggestionsList(colorScheme),
                             if (_hasSearchResults)
@@ -338,6 +404,49 @@ class _SearchPageState extends State<SearchPage> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Search Filters (Categories) ───
+  Widget _buildSearchFilters(ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
+      child: SizedBox(
+        height: 36,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: _searchFilters.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final filter = _searchFilters[index];
+            final isSelected = _activeFilter == filter['value'];
+            
+            return ActionChip(
+              label: Text(
+                filter['label']!,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
+                ),
+              ),
+              backgroundColor: isSelected ? colorScheme.primary : colorScheme.surfaceContainerHigh,
+              side: BorderSide(
+                color: isSelected ? Colors.transparent : colorScheme.primary.withValues(alpha: 0.2),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              onPressed: () {
+                setState(() {
+                  _activeFilter = filter['value']!;
+                });
+                _inputNode.unfocus();
+              },
+            );
+          },
         ),
       ),
     );
@@ -561,30 +670,16 @@ class _SearchPageState extends State<SearchPage> {
   // ─── Smart Recommendations Section ───
   Widget _buildRecommendations(Color primaryColor) {
     if (_isLoadingRecommendations) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 40),
-        child: Center(
-          child: Column(
-            children: [
-              const SizedBox(
-                height: 24,
-                width: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Color(0xFF8B5CF6),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Loading recommendations...',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionTitle(
+            'Recommended For You',
+            primaryColor,
+            icon: FluentIcons.star_24_filled,
           ),
-        ),
+          for (var i = 0; i < 4; i++) const SongBarSkeleton(),
+        ],
       );
     }
 
@@ -616,7 +711,7 @@ class _SearchPageState extends State<SearchPage> {
     final widgets = <Widget>[];
 
     // Artists section
-    if (_artistsSearchResult.isNotEmpty) {
+    if (_artistsSearchResult.isNotEmpty && (_activeFilter == 'All' || _activeFilter == 'Artists')) {
       widgets.add(
         SectionTitle(
           context.l10n!.artists,
@@ -650,7 +745,7 @@ class _SearchPageState extends State<SearchPage> {
     }
 
     // Songs section
-    if (_songsSearchResult.isNotEmpty) {
+    if (_songsSearchResult.isNotEmpty && (_activeFilter == 'All' || _activeFilter == 'Songs')) {
       widgets.add(
         SectionTitle(
           context.l10n!.songs,
@@ -659,9 +754,9 @@ class _SearchPageState extends State<SearchPage> {
         ),
       );
 
-      final songsCount = _songsSearchResult.length > maxSongsInList
-          ? maxSongsInList
-          : _songsSearchResult.length;
+      final songsCount = _activeFilter == 'Songs' 
+          ? _songsSearchResult.length 
+          : (_songsSearchResult.length > maxSongsInList ? maxSongsInList : _songsSearchResult.length);
 
       for (var index = 0; index < songsCount; index++) {
         final song = _songsSearchResult[index];
@@ -676,10 +771,28 @@ class _SearchPageState extends State<SearchPage> {
           ),
         );
       }
+      
+      if (_activeFilter == 'Songs' && _isLoadingMoreSongs) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: SizedBox(
+                height: 30,
+                width: 30,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: primaryColor,
+                ),
+              ),
+            ),
+          ),
+        );
+      }
     }
 
     // Albums section
-    if (_albumsSearchResult.isNotEmpty) {
+    if (_albumsSearchResult.isNotEmpty && (_activeFilter == 'All' || _activeFilter == 'Albums')) {
       widgets.add(
         SectionTitle(
           context.l10n!.albums,
@@ -711,7 +824,7 @@ class _SearchPageState extends State<SearchPage> {
     }
 
     // Playlists section
-    if (_playlistsSearchResult.isNotEmpty) {
+    if (_playlistsSearchResult.isNotEmpty && (_activeFilter == 'All' || _activeFilter == 'Playlists')) {
       widgets.add(
         SectionTitle(
           context.l10n!.playlists,
