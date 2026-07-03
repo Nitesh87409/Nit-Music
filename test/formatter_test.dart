@@ -135,6 +135,19 @@ void main() {
       );
     });
 
+    test('formatSongTitle returns empty for all-noise input', () {
+      expect(formatSongTitle('#trending | (Official Video)'), isEmpty);
+    });
+
+    test('formatSongTitle handles hashtag before pipe correctly', () {
+      expect(formatSongTitle('#Video | Song Name | Official', 'Some Artist'), equals('Song Name'));
+    });
+
+    test('formatSongTitle strips artist prefix', () {
+      expect(formatSongTitle('KD DESIROCK : Bhola Inside', 'KD DESIROCK'), equals('Bhola Inside'));
+      expect(formatSongTitle('Super Haryanvi - Badmash Bolu Su', 'Super Haryanvi'), equals('Badmash Bolu Su'));
+    });
+
     test('returns empty for all-noise input (fallback handled by caller)', () {
       expect(formatSongTitle('Official Music Video'), isEmpty);
     });

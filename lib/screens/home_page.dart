@@ -35,6 +35,7 @@ class _HomePageState extends State<HomePage> {
   late final Future<List> _suggestedPlaylistsFuture;
   late Future<List> _recommendedSongsFuture;
   late final Future<List> _trendingSongsFuture;
+  late final Future<List> _quickPicksFuture;
   StreamSubscription? _mediaItemSub;
   Color? _dynamicColor;
 
@@ -46,6 +47,7 @@ class _HomePageState extends State<HomePage> {
     );
     _recommendedSongsFuture = getRecommendedSongs();
     _trendingSongsFuture = getTrendingSongs();
+    _quickPicksFuture = getQuickPicks();
     externalRecommendations.addListener(_refreshRecommendedSongs);
     _mediaItemSub = audioHandler.mediaItem.listen(_updatePalette);
   }
@@ -130,6 +132,10 @@ class _HomePageState extends State<HomePage> {
                         );
                       },
                     ),
+                    _buildQuickPicksSection(),
+                    const SizedBox(height: 24),
+                    _buildSpeedDialSection(),
+                    const SizedBox(height: 24),
                     _buildSuggestedPlaylists(playlistHeight),
                     const SizedBox(height: 24),
                     _buildTrendingSection(),
@@ -291,6 +297,204 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildQuickPicksSection() {
+    return AsyncLoader<List<dynamic>>(
+      future: _quickPicksFuture,
+      loadingWidget: _buildQuickPicksSkeleton(),
+      builder: (context, data) {
+        if (data.isEmpty) return const SizedBox.shrink();
+
+        final displayData = data.take(4).toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Quick picks',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(FluentIcons.flash_24_filled, color: Colors.amber, size: 20),
+                  ],
+                ),
+                Container(
+                  height: 32,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                  ),
+                  child: TextButton(
+                    onPressed: () async {
+                      await audioHandler.playPlaylistSong(
+                        playlist: {'title': 'Quick Picks', 'list': data},
+                        songIndex: 0,
+                      );
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      'Play all',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: displayData.length,
+              padding: EdgeInsets.zero,
+              itemBuilder: (context, index) {
+                return _buildRecommendedSongTile(displayData[index], index, data);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildQuickPicksSkeleton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Quick picks',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+        const SizedBox(height: 16),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 4,
+          padding: EdgeInsets.zero,
+          itemBuilder: (context, index) {
+            return const SongBarSkeleton();
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSpeedDialSection() {
+    return ValueListenableBuilder<List>(
+      valueListenable: userRecentlyPlayed,
+      builder: (context, history, _) {
+        final speedDialItems = getSpeedDial();
+        if (speedDialItems.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Speed dial',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 120,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: speedDialItems.length,
+                itemBuilder: (context, index) {
+                  final item = speedDialItems[index];
+                  final title = item['title']?.toString() ?? '';
+                  final imageUrl = item['image']?.toString() ?? '';
+
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: GestureDetector(
+                      onTap: () async {
+                        await audioHandler.playPlaylistSong(
+                          playlist: {'title': 'Speed Dial', 'list': speedDialItems},
+                          songIndex: index,
+                        );
+                      },
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          image: imageUrl.isNotEmpty
+                              ? DecorationImage(
+                                  image: CachedNetworkImageProvider(imageUrl),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
+                        ),
+                        child: Align(
+                          alignment: Alignment.bottomLeft,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            decoration: BoxDecoration(
+                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.8),
+                                ],
+                              ),
+                            ),
+                            child: Text(
+                              title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

@@ -272,6 +272,64 @@ List _deduplicateAndShuffle(List playlistSongs) {
   return uniqueSongs;
 }
 
+/// Fetches Quick Picks: related songs based on a random seed from recent history.
+/// Returns up to 20 songs. The UI shows the first 4; "Play all" queues all 20.
+Future<List> getQuickPicks() async {
+  try {
+    // Pick a seed song from recent history (top 5 most recent)
+    String? seedId;
+    if (userRecentlyPlayed.value.isNotEmpty) {
+      final topRecent = userRecentlyPlayed.value.take(5).toList()..shuffle();
+      seedId = topRecent.first['ytid']?.toString();
+    }
+
+    // If no history, use a trending song as seed
+    if (seedId == null || seedId.isEmpty) {
+      final trending = await getTrendingSongs();
+      if (trending.isNotEmpty) {
+        final shuffled = List.from(trending)..shuffle();
+        seedId = shuffled.first['ytid']?.toString();
+      }
+    }
+
+    if (seedId == null || seedId.isEmpty) return [];
+
+    final song = await ytClient.videos.get(seedId);
+    final relatedSongs = await ytClient.videos.getRelatedVideos(song) ?? [];
+
+    final results = relatedSongs
+        .where((s) => s.duration != null && s.duration!.inMinutes <= 15)
+        .take(20)
+        .map((s) => returnSongLayout(0, s))
+        .toList();
+
+    return results;
+  } catch (e, stackTrace) {
+    logger.log('Error in getQuickPicks', error: e, stackTrace: stackTrace);
+    return [];
+  }
+}
+
+/// Returns the top 10 most-played songs from local history for Speed Dial.
+/// No network call needed — purely local Hive data.
+List getSpeedDial() {
+  try {
+    if (userRecentlyPlayed.value.isEmpty) return [];
+
+    final sorted = List.from(userRecentlyPlayed.value)
+      ..sort((a, b) {
+        final countA = (a['listeningCount'] ?? 0) as int;
+        final countB = (b['listeningCount'] ?? 0) as int;
+        return countB.compareTo(countA);
+      });
+
+    return sorted.take(10).toList();
+  } catch (e, stackTrace) {
+    logger.log('Error in getSpeedDial', error: e, stackTrace: stackTrace);
+    return [];
+  }
+}
+
 Future<void> updateSongLikeStatus(
   dynamic songId,
   bool add, {
