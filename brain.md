@@ -97,7 +97,8 @@ This file keeps track of all the changes and updates made to this personal music
 - **Mini Player True Floating & Down Swipe (v10.1.57 Update):** Completely removed layout padding for the mini player so it floats directly over content, and added a swipe-down gesture.
   - *Float Fix:* Removed the dynamic padding calculation in `bottom_navigation_page.dart` completely. The background UI now extends all the way down, and the mini player acts as a true overlay.
   - *Down Swipe:* Updated `_handleVerticalDrag` in `mini_player.dart` to trigger `audioHandler.stop()` and `_isDismissed = true` on positive (downward) vertical swipes, in addition to the horizontal swipe.
-  - *Down Swipe Animation (v10.1.60 Update):* Added a smooth 300ms downward sliding animation using `AnimatedSlide` that visually moves the mini player off-screen before stopping the audio, matching the native feel of the horizontal swipe.
+- **Mini Player Down Swipe Animation (v10.1.60 Update):** Added visual feedback for the downward swipe gesture.
+  - *Slide Animation:* Added a smooth 300ms downward sliding animation using `AnimatedSlide` that visually moves the mini player off-screen before stopping the audio, matching the native feel of the horizontal swipe.
 - **Audio Fade-Out on Pause/Stop (v10.1.58 Update):** Added a premium, smooth fade-out audio effect whenever playback is stopped or paused from anywhere in the app.
   - *Fade Logic:* Implemented a private `_fadeOut()` async method in `audio_service.dart` that smoothly decrements the volume to zero over a 300ms duration (10 steps of 30ms each).
   - *Global Integration:* Integrated the fade-out seamlessly into both the `pause()` and `stop()` methods of `MusifyAudioHandler`. 
