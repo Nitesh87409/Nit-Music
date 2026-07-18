@@ -1,0 +1,65 @@
+name: Auto Release APK
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  build:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Cache Android Debug Keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: debug-keystore-${{ runner.os }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build APK (GitHub Flavor)
+        run: flutter build apk --flavor github
+
+      - name: Extract Version
+        id: extract_version
+        run: |
+          VERSION=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2 | cut -d '+' -f 1)
+          echo "VERSION=v$VERSION" >> $GITHUB_ENV
+
+      - name: Create or Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: Release ${{ env.VERSION }}
+          body: |
+            **Nit Music Premium Update! 🚀**
+            
+            - 🎨 **Dynamic Glow:** The now playing artwork now features a dynamic light glow that adapts to the song's cover color!
+            - 🌓 **Adaptive Themes:** Fixed text visibility in light mode and updated the mini player to use responsive theme colors.
+            - 💫 **Fluid Transitions:** Smoothed out the shared-element transition from Full Player to Mini Player (no more jitter).
+            - 🚀 **Performance:** Various UI polish and compile-time bug fixes for a seamless experience.
+          files: build/app/outputs/flutter-apk/app-github-release.apk
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
