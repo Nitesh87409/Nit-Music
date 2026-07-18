@@ -52,12 +52,10 @@ jobs:
           tag_name: ${{ env.VERSION }}
           name: Release ${{ env.VERSION }}
           body: |
-            **Nit Music Premium Update! 🚀**
-            
-            - 🎨 **Dynamic Glow:** The now playing artwork now features a dynamic light glow that adapts to the song's cover color!
-            - 🌓 **Adaptive Themes:** Fixed text visibility in light mode and updated the mini player to use responsive theme colors.
-            - 💫 **Fluid Transitions:** Smoothed out the shared-element transition from Full Player to Mini Player (no more jitter).
-            - 🚀 **Performance:** Various UI polish and compile-time bug fixes for a seamless experience.
+            **Nit Music Update! 🚀**
+
+            - 🔊 **Volume Booster:** New setting under Settings → Preferences to boost volume beyond 100% (up to ~5x). Uses Android's native loudness-enhancer technology, so the audio gets louder without cracking or distorting.
+            - 🎚️ **Adjustable Boost Slider:** Drag to pick exactly how much extra volume you want, shown as a live percentage.
           files: build/app/outputs/flutter-apk/app-github-release.apk
           prerelease: false
           make_latest: true
