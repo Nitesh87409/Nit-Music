@@ -77,6 +77,18 @@ final equalizerEnabled = ValueNotifier<bool>(
 
 final equalizerBandGains = ValueNotifier<List<double>>(_readEqualizerGains());
 
+// Volume Booster: uses Android's LoudnessEnhancer effect, which applies
+// dynamic-range compression internally so the extra gain raises perceived
+// loudness without hard-clipping/distorting the audio.
+final volumeBoosterEnabled = ValueNotifier<bool>(
+  Hive.box('settings').get('volumeBoosterEnabled', defaultValue: false),
+);
+
+final volumeBoosterGainDb = ValueNotifier<double>(
+  (Hive.box('settings').get('volumeBoosterGainDb', defaultValue: 6.0) as num)
+      .toDouble(),
+);
+
 Locale languageSetting = getLocaleFromLanguageCode(
   Hive.box('settings').get('languageCode', defaultValue: 'en') as String,
 );

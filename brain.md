@@ -142,3 +142,11 @@ This file keeps track of all the changes and updates made to this personal music
     3. *Axis-Specific LPF:* Filtered axes individually before calculating magnitude. Failed because OS-level sensor lag created synthetic acceleration on sudden stops.
     4. *Orientation/Gravity Lock:* Checked `event.z > 7.5` to disable if flat. Failed in Release mode because the impact bounce momentarily drops Z gravity below 7.5, opening the lock.
     5. *Z-Blindness & Shock Lock:* Ignored Z entirely for magnitude and froze sensor for 1 sec on impact. Still registered false-positives in Release mode (likely due to phone bouncing sideways (X/Y) on mattress springs or polling interval missing the exact frame of the lock). Work paused for now.
+
+**Date: July 18, 2026**
+- **Volume Booster Feature Added:** Implemented a settings-based volume booster that raises playback volume beyond 100% without introducing hard-clipping/distortion.
+  - *Core Approach:* Used Android's native `LoudnessEnhancer` audio effect (via `AndroidLoudnessEnhancer` from the `just_audio` package), which applies dynamic-range compression internally, letting perceived loudness increase safely instead of a naive volume multiplier that would clip and crackle.
+  - *Audio Pipeline (`lib/services/audio_service.dart`):* Added `_loudnessEnhancer` to the `AudioPipeline`'s `androidAudioEffects` list alongside the existing `AndroidEqualizer`. Added `_ensureLoudnessEnhancerConfigured`, `_configureLoudnessEnhancer`, `setVolumeBoosterEnabled`, and `setVolumeBoosterGain` methods mirroring the existing equalizer initialization pattern (lazy init once an audio source is loaded, retry backoff on failure).
+  - *Settings (`lib/services/settings_manager.dart`):* Added `volumeBoosterEnabled` (default `false`) and `volumeBoosterGainDb` (default `6.0` dB, which roughly doubles perceived volume) as Hive-backed `ValueNotifier`s.
+  - *Constants (`lib/constants/app_constants.dart`):* Added `kMaxVolumeBoosterGainDb` (15.0) as a safe ceiling so the effect's compressor isn't pushed too hard, and `kDefaultVolumeBoosterGainDb` (6.0).
+  - *Settings UI (`lib/screens/settings_page.dart`):* Added a "Volume Booster" toggle in the Preferences section (right after Equalizer) with a conditional gain slider (0–15 dB, labeled as an approximate boost %) that live-updates while dragging and persists on release.

@@ -5,6 +5,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:hive/hive.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/services/common_services.dart';
@@ -19,8 +20,11 @@ import 'package:rxdart/rxdart.dart';
 class MusifyAudioHandler extends BaseAudioHandler {
   MusifyAudioHandler() {
     _androidEqualizer = AndroidEqualizer();
+    _loudnessEnhancer = AndroidLoudnessEnhancer();
     audioPlayer = AudioPlayer(
-      audioPipeline: AudioPipeline(androidAudioEffects: [_androidEqualizer]),
+      audioPipeline: AudioPipeline(
+        androidAudioEffects: [_loudnessEnhancer, _androidEqualizer],
+      ),
       audioLoadConfiguration: const AudioLoadConfiguration(
         androidLoadControl: AndroidLoadControl(
           maxBufferDuration: Duration(seconds: 60),
@@ -44,10 +48,17 @@ class MusifyAudioHandler extends BaseAudioHandler {
   }
 
   late final AndroidEqualizer _androidEqualizer;
+  late final AndroidLoudnessEnhancer _loudnessEnhancer;
   late final AudioPlayer audioPlayer;
   bool _equalizerInitialized = false;
   Future<bool>? _equalizerInitFuture;
   DateTime _equalizerRetryNotBefore = DateTime.fromMillisecondsSinceEpoch(0);
+
+  bool _loudnessEnhancerInitialized = false;
+  Future<bool>? _loudnessEnhancerInitFuture;
+  DateTime _loudnessEnhancerRetryNotBefore = DateTime.fromMillisecondsSinceEpoch(
+    0,
+  );
 
   Timer? _sleepTimer;
   Timer? _debounceTimer;
@@ -346,6 +357,9 @@ class MusifyAudioHandler extends BaseAudioHandler {
 
       // Initialize equalizer once at startup
       unawaited(_ensureEqualizerConfigured());
+
+      // Initialize volume booster once at startup
+      unawaited(_ensureLoudnessEnhancerConfigured());
     } catch (e, stackTrace) {
       logger.log(
         'Error initializing audio session',
@@ -468,6 +482,97 @@ class MusifyAudioHandler extends BaseAudioHandler {
     } catch (e, stackTrace) {
       logger.log(
         'Failed to set equalizer band gain',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<bool> _ensureLoudnessEnhancerConfigured({bool force = false}) async {
+    if (_loudnessEnhancerInitialized) return true;
+
+    final now = DateTime.now();
+    if (!force && now.isBefore(_loudnessEnhancerRetryNotBefore)) {
+      return false;
+    }
+
+    if (!force && audioPlayer.audioSource == null) {
+      return false;
+    }
+
+    final inFlight = _loudnessEnhancerInitFuture;
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    _loudnessEnhancerInitFuture = _configureLoudnessEnhancer();
+    try {
+      return await _loudnessEnhancerInitFuture!;
+    } finally {
+      _loudnessEnhancerInitFuture = null;
+    }
+  }
+
+  Future<bool> _configureLoudnessEnhancer() async {
+    try {
+      // LoudnessEnhancer applies dynamic-range compression internally, so
+      // raising this gain increases perceived loudness without hard-clipping
+      // the waveform the way a naive volume multiplier would.
+      final gain = volumeBoosterGainDb.value.clamp(
+        0.0,
+        kMaxVolumeBoosterGainDb,
+      );
+      await _loudnessEnhancer.setTargetGain(gain).timeout(
+        const Duration(seconds: 3),
+      );
+      await _loudnessEnhancer.setEnabled(volumeBoosterEnabled.value);
+      _loudnessEnhancerInitialized = true;
+      _loudnessEnhancerRetryNotBefore = DateTime.fromMillisecondsSinceEpoch(0);
+      return true;
+    } catch (e, stackTrace) {
+      _loudnessEnhancerRetryNotBefore = DateTime.now().add(
+        const Duration(seconds: 10),
+      );
+      logger.log(
+        'Volume booster initialization deferred',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      return false;
+    }
+  }
+
+  Future<void> setVolumeBoosterEnabled(bool enabled) async {
+    final initialized = await _ensureLoudnessEnhancerConfigured(force: true);
+    if (!initialized) return;
+    try {
+      await _loudnessEnhancer.setEnabled(enabled);
+      volumeBoosterEnabled.value = enabled;
+      unawaited(
+        addOrUpdateData<bool>('settings', 'volumeBoosterEnabled', enabled),
+      );
+    } catch (e, stackTrace) {
+      logger.log(
+        'Failed to set volume booster enabled state',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> setVolumeBoosterGain(double gainDb) async {
+    final initialized = await _ensureLoudnessEnhancerConfigured(force: true);
+    if (!initialized) return;
+    try {
+      final clamped = gainDb.clamp(0.0, kMaxVolumeBoosterGainDb);
+      await _loudnessEnhancer.setTargetGain(clamped);
+      volumeBoosterGainDb.value = clamped;
+      unawaited(
+        addOrUpdateData<double>('settings', 'volumeBoosterGainDb', clamped),
+      );
+    } catch (e, stackTrace) {
+      logger.log(
+        'Failed to set volume booster gain',
         error: e,
         stackTrace: stackTrace,
       );

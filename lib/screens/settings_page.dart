@@ -94,6 +94,77 @@ class SettingsPage extends StatelessWidget {
           FluentIcons.data_histogram_24_regular,
           onTap: () => context.push('/settings/equalizer'),
         ),
+        ValueListenableBuilder<bool>(
+          valueListenable: volumeBoosterEnabled,
+          builder: (_, enabled, __) {
+            return Column(
+              children: [
+                CustomBar(
+                  'Volume Booster',
+                  FluentIcons.speaker_2_24_regular,
+                  description:
+                      'Boosts volume beyond 100% without distorting the audio',
+                  trailing: Switch(
+                    value: enabled,
+                    onChanged: (value) => _toggleVolumeBooster(context, value),
+                  ),
+                ),
+                if (enabled)
+                  ValueListenableBuilder<double>(
+                    valueListenable: volumeBoosterGainDb,
+                    builder: (_, gainDb, __) {
+                      final boostPercent = ((gainDb / 6.0) * 100)
+                          .clamp(0, 400)
+                          .round();
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              FluentIcons.speaker_1_24_regular,
+                              size: 18,
+                            ),
+                            Expanded(
+                              child: Slider.adaptive(
+                                value: gainDb.clamp(
+                                  0.0,
+                                  kMaxVolumeBoosterGainDb,
+                                ),
+                                min: 0,
+                                max: kMaxVolumeBoosterGainDb,
+                                divisions: kMaxVolumeBoosterGainDb.round(),
+                                label: '~$boostPercent%',
+                                onChanged: (value) {
+                                  volumeBoosterGainDb.value = value;
+                                },
+                                onChangeEnd: (value) =>
+                                    audioHandler.setVolumeBoosterGain(value),
+                              ),
+                            ),
+                            const Icon(
+                              FluentIcons.speaker_2_24_regular,
+                              size: 20,
+                            ),
+                            SizedBox(
+                              width: 46,
+                              child: Text(
+                                '$boostPercent%',
+                                textAlign: TextAlign.end,
+                                style: Theme.of(context).textTheme.labelMedium,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            );
+          },
+        ),
         CustomBar(
           context.l10n!.dynamicColor,
           FluentIcons.toggle_left_24_regular,
@@ -694,6 +765,11 @@ class SettingsPage extends StatelessWidget {
   void _toggleAutoPlayNext(BuildContext context, bool value) {
     addOrUpdateData<bool>('settings', 'playNextSongAutomatically', value);
     playNextSongAutomatically.value = value;
+    showToast(context, context.l10n!.settingChangedMsg);
+  }
+
+  void _toggleVolumeBooster(BuildContext context, bool value) {
+    audioHandler.setVolumeBoosterEnabled(value);
     showToast(context, context.l10n!.settingChangedMsg);
   }
 

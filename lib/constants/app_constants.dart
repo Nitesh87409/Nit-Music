@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 
 const recommendedCubesNumber = 8;
 
+// Max target gain (in dB) for the Volume Booster (Android LoudnessEnhancer).
+// +6dB roughly doubles perceived volume; capping at 15dB keeps the built-in
+// dynamics compressor from being pushed so hard that quality suffers.
+const kMaxVolumeBoosterGainDb = 15.0;
+const kDefaultVolumeBoosterGainDb = 6.0;
+
 const commonSingleChildScrollViewPadding = EdgeInsets.symmetric(horizontal: 10);
 var commonBarRadius = BorderRadius.circular(16);
 var commonBarTitleStyle = const TextStyle(
