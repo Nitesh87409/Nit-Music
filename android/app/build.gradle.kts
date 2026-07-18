@@ -1,5 +1,4 @@
 import java.util.Properties
-import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
@@ -15,11 +14,26 @@ if (localPropertiesFile.exists()) {
     }
 }
 
-val keystoreProperties = Properties()
-val keystorePropertiesFile = rootProject.file("key.properties")
-if (keystorePropertiesFile.exists()) {
-    FileInputStream(keystorePropertiesFile).use { inputStream ->
-        keystoreProperties.load(inputStream)
+// Release builds are signed with the standard Android debug keystore instead
+// of a committed private key. This keeps a real signing key out of a public
+// git repo, while still producing an installable, consistently-signed APK
+// both locally and on GitHub Actions (the keystore is auto-generated here if
+// it doesn't already exist, so updates keep the same signature across runs).
+val debugKeystoreDir = File(System.getProperty("user.home"), ".android")
+val debugKeystoreFile = File(debugKeystoreDir, "debug.keystore")
+if (!debugKeystoreFile.exists()) {
+    debugKeystoreDir.mkdirs()
+    exec {
+        commandLine(
+            "keytool", "-genkeypair", "-v",
+            "-keystore", debugKeystoreFile.absolutePath,
+            "-storepass", "android",
+            "-alias", "androiddebugkey",
+            "-keypass", "android",
+            "-keyalg", "RSA", "-keysize", "2048",
+            "-validity", "10000",
+            "-dname", "CN=Android Debug,O=Android,C=US",
+        )
     }
 }
 
@@ -69,10 +83,10 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("upload-keystore.jks")
-            keyAlias = keystoreProperties["keyAlias"] as String?
-            keyPassword = keystoreProperties["keyPassword"] as String?
-            storePassword = keystoreProperties["storePassword"] as String?
+            storeFile = debugKeystoreFile
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
     }
 
