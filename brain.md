@@ -5,6 +5,9 @@ This file keeps track of all the changes and updates made to this personal music
 ## Updates Log
 
 **Date: August 21, 2026**
+- **Update Installation Reliability (v10.1.83):** Fixed two major issues preventing OTA updates from installing successfully.
+  - *Android 11+ Scoped Storage Fix:* Changed the APK download path in `lib/services/update_manager.dart` from `getExternalStorageDirectory()` to `getTemporaryDirectory()`. This allows the Android Package Installer to successfully read and parse the downloaded APK without throwing permission errors.
+  - *Signature Mismatch Prevention:* Generated a universal `musify.keystore` and committed it to the repository. Updated `android/app/build.gradle.kts` to unconditionally use this keystore for both `debug` and `release` flavors. This guarantees that local PC builds and GitHub Actions CI builds produce identically signed APKs, permanently eliminating "App not installed as package conflicts with an existing package" errors.
 - **Interactive Draggable Player Overlay:** Completely overhauled the media player transition architecture to support a fluid, 120Hz finger-tracking swipe animation.
   - *New Overlay Component:* Created `SlidingPlayerOverlay` using an `AnimationController` and `GestureDetector` to precisely track vertical drag deltas, seamlessly crossfading between the `MiniPlayer` (collapsed) and `NowPlayingPage` (expanded).
   - *BottomNavigation Integration:* Wrapped the `Scaffold` in `BottomNavigationPage` with a root `Stack` to allow the expanded player to perfectly overlay the bottom navigation bar while respecting its boundaries when collapsed.

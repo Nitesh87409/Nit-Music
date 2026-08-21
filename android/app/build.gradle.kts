@@ -69,10 +69,16 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("upload-keystore.jks")
-            keyAlias = keystoreProperties["keyAlias"] as String?
-            keyPassword = keystoreProperties["keyPassword"] as String?
-            storePassword = keystoreProperties["storePassword"] as String?
+            storeFile = file("musify.keystore")
+            keyAlias = "musify"
+            keyPassword = "musify123"
+            storePassword = "musify123"
+        }
+        getByName("debug") {
+            storeFile = file("musify.keystore")
+            keyAlias = "musify"
+            keyPassword = "musify123"
+            storePassword = "musify123"
         }
     }
 

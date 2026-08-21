@@ -105,8 +105,8 @@ class _UpdateDialogState extends State<_UpdateDialog> {
         _status = 'Downloading...';
       });
 
-      final dir = await getExternalStorageDirectory();
-      final savePath = '${dir?.path}/musify_update_${widget.latestVersion}.apk';
+      final dir = await getTemporaryDirectory();
+      final savePath = '${dir.path}/musify_update_${widget.latestVersion}.apk';
       final file = File(savePath);
 
       if (await file.exists()) {
