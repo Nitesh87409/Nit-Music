@@ -74,12 +74,6 @@ android {
             keyPassword = "musify123"
             storePassword = "musify123"
         }
-        getByName("debug") {
-            storeFile = file("musify.keystore")
-            keyAlias = "musify"
-            keyPassword = "musify123"
-            storePassword = "musify123"
-        }
     }
 
     buildFeatures {
@@ -103,6 +97,7 @@ android {
             )
         }
         getByName("debug") {
+            signingConfig = signingConfigs.getByName("release")
             applicationIdSuffix = ".debug"
             versionNameSuffix = " DEBUG"
         }

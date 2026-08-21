@@ -5,6 +5,9 @@ This file keeps track of all the changes and updates made to this personal music
 ## Updates Log
 
 **Date: August 21, 2026**
+- **GitHub Actions CI Build Fix (v10.1.84):** Fixed the instant `1-second` build crash on GitHub Actions.
+  - *Gradle Wrapper Fix:* The `gradle-wrapper.properties` file was incorrectly pointing to a hardcoded local file path (`C:/Users/NITESH/.../gradle-8.14.3-bin.zip`) from Android Studio, causing the Ubuntu CI runner to fail instantly with `FileNotFoundException`. Restored `distributionUrl` to the official web URL `https://services.gradle.org/distributions/gradle-8.3-all.zip` and removed the checksum to allow seamless cloud downloading.
+  - *Build.gradle.kts Safegaurd:* Removed the `getByName("debug")` configuration block from `signingConfigs` which can cause premature evaluation crashes on clean Linux environments. Instead, cleanly mapped the `debug` build type to use the already initialized `release` signing config, ensuring identical signatures across all flavors with zero risk of misconfiguration.
 - **Update Installation Reliability (v10.1.83):** Fixed two major issues preventing OTA updates from installing successfully.
   - *Android 11+ Scoped Storage Fix:* Changed the APK download path in `lib/services/update_manager.dart` from `getExternalStorageDirectory()` to `getTemporaryDirectory()`. This allows the Android Package Installer to successfully read and parse the downloaded APK without throwing permission errors.
   - *Signature Mismatch Prevention:* Generated a universal `musify.keystore` and committed it to the repository. Updated `android/app/build.gradle.kts` to unconditionally use this keystore for both `debug` and `release` flavors. This guarantees that local PC builds and GitHub Actions CI builds produce identically signed APKs, permanently eliminating "App not installed as package conflicts with an existing package" errors.
