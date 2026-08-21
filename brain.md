@@ -5,6 +5,8 @@ This file keeps track of all the changes and updates made to this personal music
 ## Updates Log
 
 **Date: August 21, 2026**
+- **GitHub Actions CI Build Fix (v10.1.85):** Fixed the 90-second build crash on GitHub Actions caused by an outdated Gradle wrapper.
+  - *Gradle Version Bump:* The Android Gradle Plugin (AGP) version `8.8+` explicitly requires Gradle version `8.13` or newer. The previous fallback to `8.3` caused the `com.android.application` plugin to crash during configuration on the GitHub runner. Updated the `distributionUrl` in `gradle-wrapper.properties` to `gradle-8.13-all.zip`, perfectly aligning the cloud environment with the local Android Studio requirements and successfully passing the build checks.
 - **GitHub Actions CI Build Fix (v10.1.84):** Fixed the instant `1-second` build crash on GitHub Actions.
   - *Gradle Wrapper Fix:* The `gradle-wrapper.properties` file was incorrectly pointing to a hardcoded local file path (`C:/Users/NITESH/.../gradle-8.14.3-bin.zip`) from Android Studio, causing the Ubuntu CI runner to fail instantly with `FileNotFoundException`. Restored `distributionUrl` to the official web URL `https://services.gradle.org/distributions/gradle-8.3-all.zip` and removed the checksum to allow seamless cloud downloading.
   - *Build.gradle.kts Safegaurd:* Removed the `getByName("debug")` configuration block from `signingConfigs` which can cause premature evaluation crashes on clean Linux environments. Instead, cleanly mapped the `debug` build type to use the already initialized `release` signing config, ensuring identical signatures across all flavors with zero risk of misconfiguration.
