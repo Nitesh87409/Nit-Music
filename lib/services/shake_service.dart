@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/services.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:sensors_plus/sensors_plus.dart';

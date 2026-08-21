@@ -220,7 +220,7 @@ class _QueueWidgetState extends State<QueueWidget> {
       );
     }
     return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.52,
+      height: MediaQuery.sizeOf(context).height * 0.35,
       child: _buildList(context, colorScheme, currentIndex, closeOnTap: true),
     );
   }
@@ -520,6 +520,8 @@ class _ArtworkThumbnail extends StatelessWidget {
       width: size,
       height: size,
       imageUrl: imageUrl,
+      memCacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+      memCacheHeight: (size * MediaQuery.devicePixelRatioOf(context)).round(),
       imageBuilder: (_, imageProvider) => ClipRRect(
         borderRadius: BorderRadius.circular(radius),
         child: Image(

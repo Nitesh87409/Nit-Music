@@ -222,6 +222,7 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
             supportedLocales: appSupportedLocales,
             locale: languageSetting,
             routerConfig: NavigationManager.router,
+            scrollBehavior: const BouncingScrollBehavior(),
           ),
         );
       },
@@ -229,10 +230,18 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
   }
 }
 
+/// Enforces BouncingScrollPhysics globally for buttery smooth 120Hz scrolling
+class BouncingScrollBehavior extends MaterialScrollBehavior {
+  const BouncingScrollBehavior();
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initialisation();
-
   runApp(const Musify());
 }
 
@@ -240,6 +249,7 @@ Future<void> initialisation() async {
   try {
     await Hive.initFlutter();
 
+    // Initialize Hive models and open boxes
     await Future.wait([
       Hive.openBox('settings'),
       Hive.openBox('user'),

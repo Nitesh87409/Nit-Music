@@ -23,6 +23,10 @@ final shakeToSkipSensitivity = ValueNotifier<String>(
   Hive.box('settings').get('shakeToSkipSensitivity', defaultValue: 'medium'),
 );
 
+final enableSmartSearch = ValueNotifier<bool>(
+  Hive.box('settings').get('enableSmartSearch', defaultValue: true),
+);
+
 final useSystemColor = ValueNotifier<bool>(
   Hive.box('settings').get('useSystemColor', defaultValue: true),
 );

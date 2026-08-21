@@ -19,7 +19,6 @@ import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_bar.dart';
-import 'package:musify/widgets/section_header.dart';
 
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});

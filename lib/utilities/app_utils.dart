@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:musify/constants/app_constants.dart';
-import 'package:musify/services/settings_manager.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-
 BorderRadius getItemBorderRadius(
   int index,
   int totalLength, {
@@ -90,87 +87,4 @@ String formatMonthPeriodLabel(Locale locale, String monthKey) {
       : '${label[0].toUpperCase()}${label.substring(1)}';
 }
 
-AudioOnlyStreamInfo selectAudioOnlyStreamForQuality(
-  List<AudioOnlyStreamInfo> availableSources,
-) {
-  final sortedByCompatibility = _sortAudioOnlyByCompatibility(availableSources);
-  final compatibleSources = _filterCompatibleAudioOnlySources(
-    sortedByCompatibility,
-  );
-  final selectionPool = compatibleSources.isNotEmpty
-      ? compatibleSources
-      : sortedByCompatibility;
 
-  final qualitySetting = audioQualitySetting.value;
-
-  if (qualitySetting == 'low') {
-    return selectionPool.last;
-  } else if (qualitySetting == 'medium') {
-    return selectionPool[selectionPool.length ~/ 2];
-  }
-
-  return selectionPool.withHighestBitrate();
-}
-
-List<AudioOnlyStreamInfo> _filterCompatibleAudioOnlySources(
-  List<AudioOnlyStreamInfo> sources,
-) {
-  return sources.where((stream) {
-    final codec = stream.codec.toString().toLowerCase();
-    final container = stream.container.name.toLowerCase();
-
-    if (_isDolbyCodec(codec)) {
-      return false;
-    }
-
-    return _isPreferredAudioOnlyCodec(codec, container);
-  }).toList();
-}
-
-List<AudioOnlyStreamInfo> _sortAudioOnlyByCompatibility(
-  List<AudioOnlyStreamInfo> sources,
-) {
-  final sorted = List<AudioOnlyStreamInfo>.from(sources)
-    ..sort((a, b) {
-      final aScore = _audioOnlyCompatibilityScore(a);
-      final bScore = _audioOnlyCompatibilityScore(b);
-      return bScore.compareTo(aScore);
-    });
-  return sorted;
-}
-
-int _audioOnlyCompatibilityScore(AudioOnlyStreamInfo stream) {
-  final codec = stream.codec.toString().toLowerCase();
-  final container = stream.container.name.toLowerCase();
-
-  if (_isDolbyCodec(codec)) {
-    return 0;
-  }
-
-  if ((codec.contains('mp4a') || codec.contains('aac')) &&
-      (container == 'mp4' || container == 'm4a')) {
-    return 3;
-  }
-
-  if (codec.contains('opus') || codec.contains('vorbis')) {
-    return 2;
-  }
-
-  return 1;
-}
-
-bool _isDolbyCodec(String codec) {
-  return codec.contains('ec-3') ||
-      codec.contains('ac-3') ||
-      codec.contains('eac3') ||
-      codec.contains('dolby');
-}
-
-bool _isPreferredAudioOnlyCodec(String codec, String container) {
-  if ((codec.contains('mp4a') || codec.contains('aac')) &&
-      (container == 'mp4' || container == 'm4a')) {
-    return true;
-  }
-
-  return codec.contains('opus') || codec.contains('vorbis');
-}

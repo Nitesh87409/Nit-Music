@@ -1,11 +1,7 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_flip_card/flutter_flip_card.dart';
-import 'package:musify/extensions/l10n.dart';
-import 'package:musify/services/common_services.dart';
 import 'package:musify/services/settings_manager.dart';
-import 'package:musify/utilities/async_loader.dart';
 import 'package:musify/widgets/song_artwork.dart';
 import 'package:musify/widgets/synced_lyrics_widget.dart';
 import 'package:musify/main.dart';
@@ -63,7 +59,7 @@ class NowPlayingArtwork extends StatelessWidget {
               borderRadius: BorderRadius.circular(borderRadius),
               boxShadow: [
                 BoxShadow(
-                  color: (dominantColor ?? const Color(0xFF8B5CF6)).withValues(alpha: 0.4),
+                  color: (dominantColor ?? Theme.of(context).colorScheme.primary).withValues(alpha: 0.4),
                   blurRadius: 40,
                   offset: const Offset(0, 4),
                   spreadRadius: 4,
@@ -89,7 +85,7 @@ class NowPlayingArtwork extends StatelessWidget {
           borderRadius: BorderRadius.circular(borderRadius),
           boxShadow: [
             BoxShadow(
-              color: (dominantColor ?? const Color(0xFF8B5CF6)).withValues(alpha: 0.4),
+              color: (dominantColor ?? Theme.of(context).colorScheme.primary).withValues(alpha: 0.4),
               blurRadius: 40,
               offset: const Offset(0, 4),
               spreadRadius: 4,

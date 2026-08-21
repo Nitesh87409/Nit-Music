@@ -3,15 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart'
     show closeCurrentBottomSheet;
-import 'package:musify/widgets/mini_player.dart';
+import 'package:musify/widgets/sliding_player_overlay.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:audio_service/audio_service.dart';
+
 // Global notifier to detect when the Search tab is re-tapped while already active
 final ValueNotifier<int> searchTabReselectNotifier = ValueNotifier(0);
 
@@ -29,14 +29,15 @@ class BottomNavigationPage extends StatefulWidget {
   State<BottomNavigationPage> createState() => _BottomNavigationPageState();
 }
 
-class _BottomNavigationPageState extends State<BottomNavigationPage> with TickerProviderStateMixin {
+class _BottomNavigationPageState extends State<BottomNavigationPage>
+    with TickerProviderStateMixin {
   late final _miniPlayerVisibilityStream = Rx.combineLatest2(
     audioHandler.mediaItem,
     audioHandler.playbackStateStream,
     (mediaItem, playbackState) =>
         mediaItem != null &&
         playbackState.processingState != AudioProcessingState.idle,
-  ).distinct();
+  ).distinct().asBroadcastStream();
 
   bool? _previousOfflineMode;
 
@@ -44,6 +45,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> with Ticker
   int? _previousTabIndex;
 
   late final AnimationController _animationController;
+  late final AnimationController _playerAnimController;
   late Animation<double> _animation;
 
   @override
@@ -56,12 +58,16 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> with Ticker
       value: widget.navigationShell.currentIndex.toDouble(),
     );
     _animation = _animationController;
+
+    _playerAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
   }
-
-
 
   @override
   void dispose() {
+    _playerAnimController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -69,7 +75,8 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> with Ticker
   @override
   void didUpdateWidget(BottomNavigationPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.navigationShell.currentIndex != oldWidget.navigationShell.currentIndex) {
+    if (widget.navigationShell.currentIndex !=
+        oldWidget.navigationShell.currentIndex) {
       final isOffline = offlineMode.value;
       final items = _getNavigationItems(isOffline);
       final newIndex = _getCurrentIndex(items, isOffline);
@@ -117,72 +124,92 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> with Ticker
               final isLargeScreen = MediaQuery.of(context).size.width >= 600;
               final items = _getNavigationItems(isOfflineMode);
 
-              return Scaffold(
-                body: SafeArea(
-                  child: Row(
-                    children: [
-                      if (isLargeScreen)
-                        NavigationRail(
-                          labelType: NavigationRailLabelType.selected,
-                          destinations: items
-                              .map(
-                                (item) => NavigationRailDestination(
-                                  icon: Icon(item.icon),
-                                  selectedIcon: Icon(item.selectedIcon),
-                                  label: Text(item.label),
-                                ),
-                              )
-                              .toList(),
-                          selectedIndex: _getCurrentIndex(items, isOfflineMode),
-                          onDestinationSelected: (index) =>
-                              _onTabTapped(index, items),
-                        ),
-                      Expanded(
-                        child: StreamBuilder<bool>(
-                          initialData: audioHandler.mediaItem.value != null,
-                          stream: _miniPlayerVisibilityStream,
-                          builder: (context, snapshot) {
-                            final mediaQuery = MediaQuery.of(context);
-
-                            return Stack(
-                              alignment: Alignment.bottomCenter,
-                              children: [
-                                MediaQuery(
-                                  data: mediaQuery.copyWith(
-                                    padding: mediaQuery.padding.copyWith(
-                                      bottom: mediaQuery.padding.bottom,
+              return Stack(
+                children: [
+                  Scaffold(
+                    body: SafeArea(
+                      child: Row(
+                        children: [
+                          if (isLargeScreen)
+                            NavigationRail(
+                              labelType: NavigationRailLabelType.selected,
+                              destinations: items
+                                  .map(
+                                    (item) => NavigationRailDestination(
+                                      icon: Icon(item.icon),
+                                      selectedIcon: Icon(item.selectedIcon),
+                                      label: Text(item.label),
                                     ),
-                                  ),
-                                  child: IndexedStack(
-                                    index: widget.navigationShell.currentIndex,
-                                    children: widget.children,
-                                  ),
-                                ),
-                                const Padding(
-                                  padding: EdgeInsets.only(
-                                    left: 16,
-                                    right: 16,
-                                    bottom: 16,
-                                  ),
-                                  child: MiniPlayer(),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
+                                  )
+                                  .toList(),
+                              selectedIndex: _getCurrentIndex(
+                                items,
+                                isOfflineMode,
+                              ),
+                              onDestinationSelected: (index) =>
+                                  _onTabTapped(index, items),
+                            ),
+                          Expanded(
+                            child: StreamBuilder<bool>(
+                              initialData: audioHandler.mediaItem.value != null,
+                              stream: _miniPlayerVisibilityStream,
+                              builder: (context, snapshot) {
+                                final mediaQuery = MediaQuery.of(context);
+
+                                return Stack(
+                                  alignment: Alignment.bottomCenter,
+                                  children: [
+                                    MediaQuery(
+                                      data: mediaQuery.copyWith(
+                                        padding: mediaQuery.padding.copyWith(
+                                          bottom: mediaQuery.padding.bottom,
+                                        ),
+                                      ),
+                                      child: IndexedStack(
+                                        index:
+                                            widget.navigationShell.currentIndex,
+                                        children: widget.children,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                    bottomNavigationBar: !isLargeScreen
+                        ? CustomBottomNavigationBar(
+                            items: items,
+                            selectedIndex: _getCurrentIndex(
+                              items,
+                              isOfflineMode,
+                            ),
+                            animation: _animation,
+                            onDestinationSelected: (index) =>
+                                _onTabTapped(index, items),
+                          )
+                        : null,
                   ),
-                ),
-                bottomNavigationBar: !isLargeScreen
-                    ? CustomBottomNavigationBar(
-                        items: items,
-                        selectedIndex: _getCurrentIndex(items, isOfflineMode),
-                        animation: _animation,
-                        onDestinationSelected: (index) =>
-                            _onTabTapped(index, items),
-                      )
-                    : null,
+                  StreamBuilder<bool>(
+                    initialData: audioHandler.mediaItem.value != null,
+                    stream: _miniPlayerVisibilityStream,
+                    builder: (context, snapshot) {
+                      if (widget.navigationShell.currentIndex == 3) {
+                        return const SizedBox.shrink();
+                      }
+                      final isVisible = snapshot.data == true;
+                      return SlidingPlayerOverlay(
+                        animationController: _playerAnimController,
+                        isVisible: isVisible,
+                        bottomMargin: isLargeScreen
+                            ? 0.0
+                            : 72.0 + MediaQuery.of(context).padding.bottom,
+                      );
+                    },
+                  ),
+                ],
               );
             },
           );
@@ -331,14 +358,14 @@ class CustomBottomNavigationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Container(
       height: 70,
       color: theme.colorScheme.surface,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final tabWidth = constraints.maxWidth / items.length;
-          
+
           return Stack(
             children: [
               // The animated pill
@@ -346,85 +373,89 @@ class CustomBottomNavigationBar extends StatelessWidget {
                 animation: animation,
                 builder: (context, child) {
                   // Center the 64px pill horizontally within the active tab
-                  final leftOffset = animation.value * tabWidth + (tabWidth - 64) / 2;
-                  
-                  return Positioned(
-                    // Vertically position to align perfectly behind the 24px icon
-                    top: 10,
-                    left: leftOffset,
+                  final leftOffset =
+                      animation.value * tabWidth + (tabWidth - 64) / 2;
+
+                  return Transform.translate(
+                    offset: Offset(leftOffset, 10),
                     child: Container(
                       width: 64,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer,
+                        color: theme.colorScheme.primaryContainer,
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
                   );
                 },
               ),
-              
+
               // The icons and labels
               Row(
-            children: List.generate(items.length, (index) {
-              final item = items[index];
-              return Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => onDestinationSelected(index),
-                  child: AnimatedBuilder(
-                    animation: animation,
-                    builder: (context, child) {
-                      // Distance from the current animating index to this item's index
-                      // 0.0 means perfectly centered on this item.
-                      // 1.0 or greater means the pill is completely on another item.
-                      final distance = (animation.value - index).abs();
-                      final isSelected = distance < 0.5;
-                      final t = (1.0 - distance).clamp(0.0, 1.0); // 1.0 when active, 0.0 when inactive
+                children: List.generate(items.length, (index) {
+                  final item = items[index];
+                  return Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onDestinationSelected(index),
+                      child: AnimatedBuilder(
+                        animation: animation,
+                        builder: (context, child) {
+                          // Distance from the current animating index to this item's index
+                          // 0.0 means perfectly centered on this item.
+                          // 1.0 or greater means the pill is completely on another item.
+                          final distance = (animation.value - index).abs();
+                          final isSelected = distance < 0.5;
+                          final t = (1.0 - distance).clamp(
+                            0.0,
+                            1.0,
+                          ); // 1.0 when active, 0.0 when inactive
 
-                      final iconColor = Color.lerp(
-                        colorScheme.onSurfaceVariant,
-                        colorScheme.onPrimaryContainer,
-                        t,
-                      );
-                      
-                      final labelColor = Color.lerp(
-                        colorScheme.onSurfaceVariant,
-                        colorScheme.onSurface,
-                        t,
-                      );
+                          final iconColor = Color.lerp(
+                            colorScheme.onSurfaceVariant,
+                            colorScheme.onPrimaryContainer,
+                            t,
+                          );
 
-                      final fontWeight = isSelected ? FontWeight.w600 : FontWeight.w500;
+                          final labelColor = Color.lerp(
+                            colorScheme.onSurfaceVariant,
+                            colorScheme.onSurface,
+                            t,
+                          );
 
-                      return Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            isSelected ? item.selectedIcon : item.icon,
-                            color: iconColor,
-                            size: 24,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            item.label,
-                            style: TextStyle(
-                              color: labelColor,
-                              fontSize: 12,
-                              fontWeight: fontWeight,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              );
-            }),
-          ),
-        ],
-      );
+                          final fontWeight = isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w500;
+
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                isSelected ? item.selectedIcon : item.icon,
+                                color: iconColor,
+                                size: 24,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                item.label,
+                                style: TextStyle(
+                                  color: labelColor,
+                                  fontSize: 12,
+                                  fontWeight: fontWeight,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          );
         },
       ),
     );

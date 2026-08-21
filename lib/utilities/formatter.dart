@@ -1,4 +1,3 @@
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 // --------------------------------------------------------------------------
 // Noise-term dictionary (case-insensitive, used inside bracket & trailing
@@ -125,32 +124,13 @@ String formatSongTitle(String title, [String? author]) {
   return t.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
 }
 
-Map<String, dynamic> returnSongLayout(
-  int index,
-  Video song, {
-  String? playlistImage,
-}) {
-  final sep = song.title.indexOf(' - ');
-  final artist = sep != -1 ? song.title.substring(0, sep) : song.author;
-  final rawTitle = sep != -1 ? song.title.substring(sep + 3) : song.title;
-  final title = formatSongTitle(rawTitle, artist);
 
-  return {
-    'id': index,
-    'ytid': song.id.toString(),
-    'title': title.isEmpty ? rawTitle.trim() : title,
-    'artist': artist,
-    'artistId': song.channelId.toString(),
-    'videoAuthor': song.author,
-    'image': playlistImage ?? song.thumbnails.standardResUrl,
-    'lowResImage': playlistImage ?? song.thumbnails.lowResUrl,
-    'highResImage': playlistImage ?? song.thumbnails.maxResUrl,
-    'duration': song.duration?.inSeconds,
-    'isLive': song.isLive,
-  };
+
+String? getSongId(String url) {
+  final ytRegex = RegExp(r'(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})');
+  final match = ytRegex.firstMatch(url);
+  return match?.group(1);
 }
-
-String? getSongId(String url) => VideoId.parseVideoId(url);
 
 String formatDuration(int audioDurationInSeconds) {
   final duration = Duration(seconds: audioDurationInSeconds);
@@ -165,3 +145,12 @@ String formatDuration(int audioDurationInSeconds) {
     seconds.toString().padLeft(2, '0'),
   ].join(':');
 }
+
+String normalizeArtistDisplayTitle(String title) {
+  return title.trim();
+}
+
+String normalizeArtistThumbnailUrl(String? url) {
+  return url ?? '';
+}
+

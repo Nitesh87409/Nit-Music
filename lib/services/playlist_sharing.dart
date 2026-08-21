@@ -1,10 +1,7 @@
 import 'dart:convert';
 
 import 'package:musify/main.dart';
-import 'package:musify/services/proxy_manager.dart';
-import 'package:musify/services/settings_manager.dart';
-import 'package:musify/utilities/formatter.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:musify/services/jiosaavn_api.dart';
 
 class PlaylistSharingService {
   static Map createCompactPlaylist(Map fullPlaylist) {
@@ -18,19 +15,17 @@ class PlaylistSharingService {
 
   static Future<Map> expandCompactPlaylist(Map compactPlaylist) async {
     final List<dynamic> songIds = compactPlaylist['list'];
-    YoutubeExplode? ytClient;
     try {
-      if (useProxy.value) {
-        ytClient = await ProxyManager().getYoutubeExplodeClient();
-      } else {
-        ytClient = ProxyManager().getClientSync();
-      }
+      final saavn = JioSaavnApi.instance;
 
       final expandedSongs = await Future.wait(
         songIds.map((ytid) async {
           try {
-            final video = await ytClient!.videos.get(ytid);
-            return returnSongLayout(songIds.indexOf(ytid), video);
+            final songData = await saavn.getSongDetails(ytid.toString());
+            if (songData != null) {
+              return saavn.formatSong(songData, index: songIds.indexOf(ytid));
+            }
+            return null;
           } catch (e, stackTrace) {
             logger.log(
               'Error expanding song: $ytid',
@@ -47,11 +42,7 @@ class PlaylistSharingService {
         'list': expandedSongs.where((song) => song != null).toList(),
       };
     } finally {
-      try {
-        if (useProxy.value) {
-          ytClient?.close();
-        }
-      } catch (_) {}
+      // Nothing to close
     }
   }
 

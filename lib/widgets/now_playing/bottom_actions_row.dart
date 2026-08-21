@@ -173,14 +173,14 @@ class _BottomActionsRowState extends State<BottomActionsRow> {
               icon: Icon(
                 isActive ? activeIcon : icon,
                 color: isActive
-                    ? const Color(0xFF8B5CF6)
+                    ? Theme.of(context).colorScheme.primary
                     : colorScheme.onSurfaceVariant,
               ),
               iconSize: size,
               tooltip: tooltip,
               style: IconButton.styleFrom(
                 backgroundColor: isActive
-                    ? const Color(0xFF8B5CF6).withOpacity(0.15)
+                    ? Theme.of(context).colorScheme.primary.withOpacity(0.15)
                     : Colors.transparent,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(
@@ -238,14 +238,14 @@ class _BottomActionsRowState extends State<BottomActionsRow> {
                     ? FluentIcons.timer_24_filled
                     : FluentIcons.timer_24_regular,
                 color: isActive
-                    ? const Color(0xFF8B5CF6)
+                    ? Theme.of(context).colorScheme.primary
                     : colorScheme.onSurfaceVariant,
               ),
               iconSize: size,
               tooltip: context.l10n!.sleepTimer,
               style: IconButton.styleFrom(
                 backgroundColor: isActive
-                    ? const Color(0xFF8B5CF6).withOpacity(0.15)
+                    ? Theme.of(context).colorScheme.primary.withOpacity(0.15)
                     : Colors.transparent,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(

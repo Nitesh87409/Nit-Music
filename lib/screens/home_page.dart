@@ -5,7 +5,7 @@ import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
-import 'package:musify/services/listening_stats_service.dart';
+import 'package:musify/screens/search_page.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
@@ -18,9 +18,6 @@ import 'package:musify/widgets/announcement_box.dart';
 import 'package:musify/widgets/listening_recap_card.dart';
 import 'package:musify/widgets/overflow_menu_button.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
-import 'package:musify/widgets/playlist_cube.dart';
-import 'package:musify/widgets/section_header.dart';
-import 'package:musify/widgets/spinner.dart';
 import 'package:musify/widgets/skeleton_loader.dart';
 import 'package:musify/widgets/song_bar.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -53,12 +50,14 @@ class _HomePageState extends State<HomePage> {
     _trendingSongsFuture = getTrendingSongs();
     _quickPicksFuture = getQuickPicks();
     externalRecommendations.addListener(_refreshRecommendedSongs);
+    searchHistoryNotifier.addListener(_refreshRecommendedSongs);
     _mediaItemSub = audioHandler.mediaItem.listen(_updatePalette);
   }
 
   @override
   void dispose() {
     externalRecommendations.removeListener(_refreshRecommendedSongs);
+    searchHistoryNotifier.removeListener(_refreshRecommendedSongs);
     _mediaItemSub?.cancel();
     super.dispose();
   }
@@ -190,117 +189,6 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildSearchBar(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: GestureDetector(
-            onTap: () => context.push('/search'),
-            child: Container(
-              height: 52,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(26),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  const Icon(FluentIcons.search_24_regular, color: Colors.grey),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Search songs, artists, albums...',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Container(
-          width: 52,
-          height: 52,
-          decoration: const BoxDecoration(
-            color: Color(0xFF8B5CF6),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            FluentIcons.mic_24_filled, // Using mic icon as placeholder for waveform
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGreetingBanner(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2C2442), Color(0xFF181534)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Good evening, Shivam 👋',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Let\'s play something amazing',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(0xFF8B5CF6),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Icon(
-              FluentIcons.play_24_filled,
-              color: Theme.of(context).colorScheme.onSurface,
-              size: 24,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -457,7 +345,7 @@ class _HomePageState extends State<HomePage> {
                           color: Theme.of(context).colorScheme.surfaceContainerHighest,
                           image: imageUrl.isNotEmpty
                               ? DecorationImage(
-                                  image: CachedNetworkImageProvider(imageUrl),
+                                  image: CachedNetworkImageProvider(imageUrl, maxWidth: 300, maxHeight: 300),
                                   fit: BoxFit.cover,
                                 )
                               : null,
@@ -633,7 +521,7 @@ class _HomePageState extends State<HomePage> {
               borderRadius: BorderRadius.circular(16),
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
               image: DecorationImage(
-                image: CachedNetworkImageProvider(imageUrl),
+                image: CachedNetworkImageProvider(imageUrl, maxWidth: 400, maxHeight: 400),
                 fit: BoxFit.cover,
               ),
             ),
@@ -740,7 +628,7 @@ class _HomePageState extends State<HomePage> {
                                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                 image: imageUrl.isNotEmpty
                                     ? DecorationImage(
-                                        image: CachedNetworkImageProvider(imageUrl),
+                                        image: CachedNetworkImageProvider(imageUrl, maxWidth: 300, maxHeight: 300),
                                         fit: BoxFit.cover,
                                       )
                                     : null,
@@ -965,7 +853,7 @@ class _HomePageState extends State<HomePage> {
                 borderRadius: BorderRadius.circular(12),
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 image: DecorationImage(
-                  image: CachedNetworkImageProvider(imageUrl),
+                  image: CachedNetworkImageProvider(imageUrl, maxWidth: 200, maxHeight: 200),
                   fit: BoxFit.cover,
                 ),
               ),

@@ -31,110 +31,115 @@ class _CustomSearchBarState extends State<CustomSearchBar> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Container(
+        height: 46, // Reduced height
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(50),
+          color: colorScheme.surface, // Solid color instead of glassmorphism
+          borderRadius: BorderRadius.circular(12), // Less rounded corners like image
+          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(50),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: SearchBar(
-              elevation: WidgetStateProperty.all(0),
-              shadowColor: WidgetStateProperty.all(Colors.transparent),
-              backgroundColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.focused)) {
-                  return colorScheme.surfaceContainerHighest.withValues(alpha: 0.85);
-                }
-                return colorScheme.surfaceContainerHighest.withValues(alpha: 0.65);
-              }),
-              side: WidgetStateProperty.all(
-                BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
-              ),
-              overlayColor: WidgetStateProperty.all(
-                const Color(0xFF8B5CF6).withValues(alpha: 0.08),
-              ),
-              shape: WidgetStateProperty.all(
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-              ),
-              padding: WidgetStateProperty.all(
-                const EdgeInsets.symmetric(horizontal: 16),
-              ),
-        hintText: widget.labelText,
-        hintStyle: WidgetStateProperty.all(
-          TextStyle(
-            color: colorScheme.onSurfaceVariant,
-            fontSize: 16,
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-        textStyle: WidgetStateProperty.all(
-          TextStyle(
-            color: colorScheme.onSurface,
-            fontSize: 16,
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-        leading: Icon(
-          FluentIcons.search_24_regular,
-          color: colorScheme.onSurfaceVariant,
-          size: 22,
-        ),
-        onSubmitted: (String value) {
-          widget.onSubmitted(value);
-          widget.focusNode.unfocus();
-        },
-        onChanged: widget.onChanged != null
-            ? (value) async {
-                widget.onChanged!(value);
-                setState(() {});
-              }
-            : null,
-        textInputAction: TextInputAction.search,
-        controller: widget.controller,
-        focusNode: widget.focusNode,
-        trailing: [
-          if (widget.controller.text.isNotEmpty)
-            IconButton(
-              icon: Icon(
-                FluentIcons.dismiss_24_regular,
+          borderRadius: BorderRadius.circular(12),
+          child: SearchBar(
+            constraints: const BoxConstraints(minHeight: 46, maxHeight: 46),
+            elevation: WidgetStateProperty.all(0),
+            shadowColor: WidgetStateProperty.all(Colors.transparent),
+            backgroundColor: WidgetStateProperty.all(Colors.transparent),
+            side: WidgetStateProperty.all(BorderSide.none),
+            overlayColor: WidgetStateProperty.all(
+              colorScheme.primary.withValues(alpha: 0.08),
+            ),
+            shape: WidgetStateProperty.all(
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            padding: WidgetStateProperty.all(
+              const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            hintText: widget.labelText,
+            hintStyle: WidgetStateProperty.all(
+              TextStyle(
                 color: colorScheme.onSurfaceVariant,
-                size: 20,
+                fontSize: 15,
+                fontWeight: FontWeight.w400,
               ),
-              onPressed: () {
-                widget.controller.clear();
-                widget.onChanged?.call('');
-                setState(() {});
-              },
             ),
-          if (widget.loadingProgressNotifier != null)
-            ValueListenableBuilder<bool>(
-              valueListenable: widget.loadingProgressNotifier!,
-              builder: (_, value, __) {
-                if (value) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
+            textStyle: WidgetStateProperty.all(
+              TextStyle(
+                color: colorScheme.onSurface,
+                fontSize: 15,
+                fontWeight: FontWeight.w400,
+              ),
             ),
-        ],
-      ),
+            leading: Icon(
+              FluentIcons.search_24_regular,
+              color: colorScheme.onSurface,
+              size: 22,
+            ),
+            onSubmitted: (String value) {
+              widget.onSubmitted(value);
+              widget.focusNode.unfocus();
+            },
+            onChanged: widget.onChanged != null
+                ? (value) async {
+                    widget.onChanged!(value);
+                    setState(() {});
+                  }
+                : null,
+            textInputAction: TextInputAction.search,
+            controller: widget.controller,
+            focusNode: widget.focusNode,
+            trailing: [
+              if (widget.controller.text.isNotEmpty)
+                IconButton(
+                  icon: Icon(
+                    FluentIcons.dismiss_24_regular,
+                    color: colorScheme.onSurfaceVariant,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    widget.controller.clear();
+                    widget.onChanged?.call('');
+                    setState(() {});
+                  },
+                )
+              else
+                IconButton(
+                  icon: Icon(
+                    FluentIcons.mic_24_regular,
+                    color: colorScheme.onSurfaceVariant,
+                    size: 22,
+                  ),
+                  onPressed: () {
+                    // Voice search placeholder
+                  },
+                ),
+              if (widget.loadingProgressNotifier != null)
+                ValueListenableBuilder<bool>(
+                  valueListenable: widget.loadingProgressNotifier!,
+                  builder: (_, value, __) {
+                    if (value) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+            ],
           ),
         ),
       ),

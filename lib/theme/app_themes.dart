@@ -66,8 +66,7 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       : ThemeData.dark();
 
   final isLight = colorScheme.brightness == Brightness.light;
-  final isPureBlack =
-      colorScheme.brightness == Brightness.dark && usePureBlackColor.value;
+
 
   // Dark Purple theme colors
   const darkBgColorValue = Color(0xFF09090E);

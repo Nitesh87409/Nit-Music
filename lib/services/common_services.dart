@@ -5,17 +5,17 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
-import 'package:musify/constants/clients.dart';
 import 'package:musify/main.dart' show logger;
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/io_service.dart';
+import 'package:musify/services/jiosaavn_api.dart';
 import 'package:musify/services/lyrics_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
-import 'package:musify/services/proxy_manager.dart';
+import 'package:musify/screens/search_page.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/services/smart_search_algorithm.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/formatter.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 List globalSongs = [];
 
@@ -48,82 +48,17 @@ void reloadSongLibraryStateFromStorage() {
   );
 }
 
-// Timeouts and durations used across manifest fetching and cache validation.
-const Duration _manifestTimeout = Duration(seconds: 30);
-const Duration _cacheValidationDuration = Duration(hours: 1);
+// JioSaavn API instance for all music operations.
+final _saavn = JioSaavnApi.instance;
 
-/// Fetches a stream manifest for a song, honoring proxy settings.
-Future<StreamManifest?> _fetchStreamManifest(String songId) async {
-  if (useProxy.value) {
-    return ProxyManager().getSongManifest(songId).timeout(_manifestTimeout);
-  }
 
-  return ytClient.videos.streams
-      .getManifest(songId, ytClients: customClients)
-      .timeout(_manifestTimeout);
-}
 
-/// Returns a cached song URL if present and still valid.
-Future<String?> _getCachedSongUrl(
-  String cacheKey,
-  Duration cacheDuration,
-) async {
-  final cachedUrl = await getData(
-    'cache',
-    cacheKey,
-    cachingDuration: cacheDuration,
-  );
 
-  if (cachedUrl is! String || cachedUrl.isEmpty) {
-    return null;
-  }
-
-  final cacheBox = await Hive.openBox('cache');
-  final cacheDate = cacheBox.get('${cacheKey}_date') as DateTime?;
-  final now = DateTime.now();
-  final isOld =
-      cacheDate != null && now.difference(cacheDate) > _cacheValidationDuration;
-
-  if (!isOld) {
-    return cachedUrl;
-  }
-
-  if (await _validateCachedUrl(cachedUrl)) {
-    return cachedUrl;
-  }
-
-  await deleteData('cache', cacheKey);
-  await deleteData('cache', '${cacheKey}_date');
-  return null;
-}
-
-/// Checks if a cached URL still responds successfully.
-Future<bool> _validateCachedUrl(String cachedUrl) async {
-  try {
-    final response = await http.head(Uri.parse(cachedUrl));
-    return response.statusCode >= 200 && response.statusCode < 300;
-  } catch (_) {
-    return false;
-  }
-}
 
 Future<List> getTrendingSongs() async {
   try {
-    // Use YouTube search to find trending Hindi music
-    final queries = [
-      'trending Hindi songs 2026',
-      'new Bollywood songs this week',
-      'latest Hindi music',
-    ];
-    final selectedQuery = (queries..shuffle()).first;
-    
-    final List<Video> searchResults = await ytClient.search.search(selectedQuery);
-    final trendingSongs = searchResults
-        .take(15)
-        .map((video) => returnSongLayout(0, video))
-        .toList();
-    
-    return trendingSongs;
+    final results = await _saavn.getTrendingSongs();
+    return results.map((song) => _saavn.formatSong(song)).toList();
   } catch (e, stackTrace) {
     logger.log('Error in getTrendingSongs', error: e, stackTrace: stackTrace);
     return [];
@@ -132,29 +67,38 @@ Future<List> getTrendingSongs() async {
 
 Future<List> fetchSongsList(String searchQuery) async {
   try {
-    // If not in cache, perform the search
-    final VideoSearchList searchResults = await ytClient.search.search(searchQuery);
-    final songsList = searchResults
-        .map((video) => returnSongLayout(0, video))
-        .toList();
-
-    return songsList;
+    final results = await _saavn.searchSongs(searchQuery);
+    return results.map((song) => _saavn.formatSong(song)).toList();
   } catch (e, stackTrace) {
     logger.log('Error in fetchSongsList', error: e, stackTrace: stackTrace);
     return [];
   }
 }
 
+/// Tracks the current page number for paginated search.
+int _currentSearchPage = 1;
+String _lastSearchQuery = '';
+
 Future<Map<String, dynamic>> fetchSongsListWithPagination(String searchQuery) async {
   try {
-    final VideoSearchList searchResults = await ytClient.search.search(searchQuery);
-    final songsList = searchResults
-        .map((video) => returnSongLayout(0, video))
-        .toList();
+    _currentSearchPage = 1;
+    _lastSearchQuery = searchQuery;
+    
+    final smartSearch = SmartSearchAlgorithm();
+    
+    // Always clean the query BEFORE calling API
+    String apiQuery = smartSearch.getCleanedQuery(searchQuery);
+    
+    final regularResults = await _saavn.searchSongs(apiQuery, page: 1);
+    
+    // Always apply Smart Search scoring & sorting
+    List<Map<String, dynamic>> finalResults = await smartSearch.processSearch(apiQuery, regularResults);
+    
+    final formattedSongs = finalResults.map((song) => _saavn.formatSong(song)).toList();
 
     return {
-      'songs': songsList,
-      'nextPage': searchResults,
+      'songs': formattedSongs,
+      'nextPage': formattedSongs.length >= 20 ? (_currentSearchPage + 1) : null,
     };
   } catch (e, stackTrace) {
     logger.log('Error in fetchSongsListWithPagination', error: e, stackTrace: stackTrace);
@@ -163,21 +107,20 @@ Future<Map<String, dynamic>> fetchSongsListWithPagination(String searchQuery) as
 }
 
 Future<Map<String, dynamic>> fetchNextSongsList(dynamic currentList) async {
-  if (currentList == null || currentList is! VideoSearchList) {
+  if (currentList == null) {
     return {'songs': [], 'nextPage': null};
   }
-  
+
   try {
-    final VideoSearchList? searchResults = await currentList.nextPage();
-    if (searchResults == null) return {'songs': [], 'nextPage': null};
-    
-    final songsList = searchResults
-        .map((video) => returnSongLayout(0, video))
-        .toList();
+    _currentSearchPage = (currentList is int) ? currentList : _currentSearchPage + 1;
+    final results = await _saavn.searchSongs(_lastSearchQuery, page: _currentSearchPage);
+    if (results.isEmpty) return {'songs': [], 'nextPage': null};
+
+    final songsList = results.map((song) => _saavn.formatSong(song)).toList();
 
     return {
       'songs': songsList,
-      'nextPage': searchResults,
+      'nextPage': results.length >= 20 ? (_currentSearchPage + 1) : null,
     };
   } catch (e, stackTrace) {
     logger.log('Error in fetchNextSongsList', error: e, stackTrace: stackTrace);
@@ -186,39 +129,89 @@ Future<Map<String, dynamic>> fetchNextSongsList(dynamic currentList) async {
 }
 
 Future<List> getRecommendedSongs() async {
-  try {
-    if (externalRecommendations.value && userRecentlyPlayed.value.isNotEmpty) {
-      return await _getRecommendationsFromRecentlyPlayed();
-    } else {
-      return await _getRecommendationsFromMixedSources();
-    }
-  } catch (e, stackTrace) {
+    try {
+      final List searchHistoryList = searchHistoryNotifier.value;
+      if (searchHistoryList.isNotEmpty) {
+        return await _getRecommendationsFromSearchHistory();
+      } else if (userRecentlyPlayed.value.isNotEmpty) {
+        return await _getRecommendationsFromRecentlyPlayed();
+      } else {
+        return await _getRecommendationsFromMixedSources();
+      }
+    } catch (e, stackTrace) {
     logger.log(
       'Error in getRecommendedSongs',
       error: e,
       stackTrace: stackTrace,
     );
     return [];
+    }
   }
-}
 
-Future<List> _getRecommendationsFromRecentlyPlayed() async {
+  Future<List> _getRecommendationsFromSearchHistory() async {
+    try {
+      final List searchHistoryList = searchHistoryNotifier.value;
+      
+      // Get the 2 most recent unique searches
+      final recentSearches = searchHistoryList.take(2).toList();
+      
+      final futures = recentSearches.map((query) async {
+        try {
+          final q = query.toString().trim();
+          if (q.isEmpty) return <Map>[];
+          
+          final smartSearch = SmartSearchAlgorithm();
+          final apiQuery = smartSearch.getCleanedQuery(q);
+          
+          final regularResults = await _saavn.searchSongs(apiQuery, page: 1);
+          final finalResults = await smartSearch.processSearch(apiQuery, regularResults);
+          
+          return finalResults.take(10).map((s) => _saavn.formatSong(s)).toList();
+        } catch (e) {
+          return <Map>[];
+        }
+      }).toList();
+      
+      final results = await Future.wait(futures);
+      final searchSongs = results.expand((list) => list).toList();
+      
+      // Blend with recently played to keep the mix healthy
+      List recentlyPlayedSongs = [];
+      if (userRecentlyPlayed.value.isNotEmpty) {
+        recentlyPlayedSongs = (List.from(userRecentlyPlayed.value)..shuffle()).take(5).toList();
+      }
+      
+      final allSongs = [...searchSongs, ...recentlyPlayedSongs];
+      return _deduplicateAndShuffle(allSongs);
+      
+    } catch (e, stackTrace) {
+      logger.log(
+        'Error getting recommendations from search history',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      if (userRecentlyPlayed.value.isNotEmpty) {
+        return await _getRecommendationsFromRecentlyPlayed();
+      } else {
+        return await _getRecommendationsFromMixedSources();
+      }
+    }
+  }
+  
+  Future<List> _getRecommendationsFromRecentlyPlayed() async {
   final recent = (List.from(
     userRecentlyPlayed.value,
   )..shuffle()).take(3).toList();
 
   final futures = recent.map((songData) async {
     try {
-      final song = await ytClient.videos.get(songData['ytid']);
-      final relatedSongs = await ytClient.videos.getRelatedVideos(song) ?? [];
-      return relatedSongs
-          .where((s) => s.duration != null && s.duration!.inMinutes <= 15)
-          .take(3)
-          .map((s) => returnSongLayout(0, s))
-          .toList();
+      final songId = songData['ytid']?.toString() ?? '';
+      if (songId.isEmpty) return <Map>[];
+      final related = await _saavn.getRelatedSongs(songId);
+      return related.take(5).map((s) => _saavn.formatSong(s)).toList();
     } catch (e, stackTrace) {
       logger.log(
-        'Error getting related videos for ${songData['ytid']}',
+        'Error getting related songs for ${songData['ytid']}',
         error: e,
         stackTrace: stackTrace,
       );
@@ -227,7 +220,6 @@ Future<List> _getRecommendationsFromRecentlyPlayed() async {
   }).toList();
 
   final results = await Future.wait(futures);
-  // Limit to 15 items max for performance
   final playlistSongs = results.expand((list) => list).take(15).toList()
     ..shuffle();
   return playlistSongs;
@@ -238,12 +230,6 @@ Future<List> _getRecommendationsFromMixedSources() async {
     ...userLikedSongsList.value,
     ...userRecentlyPlayed.value,
   ];
-
-  if (globalSongs.isEmpty) {
-    const playlistId = 'PLgzTt0k8mXzEk586ze4BjvDXR7c-TUSnx';
-    globalSongs = await getSongsFromPlaylist(playlistId);
-  }
-  playlistSongs.addAll(globalSongs.take(10));
 
   if (userCustomPlaylists.value.isNotEmpty) {
     for (final userPlaylist in userCustomPlaylists.value) {
@@ -264,7 +250,6 @@ List _deduplicateAndShuffle(List playlistSongs) {
   for (final song in playlistSongs) {
     if (song['ytid'] != null && seenYtIds.add(song['ytid'])) {
       uniqueSongs.add(song);
-      // Early exit when we have enough songs
       if (uniqueSongs.length >= 15) break;
     }
   }
@@ -273,45 +258,80 @@ List _deduplicateAndShuffle(List playlistSongs) {
 }
 
 /// Fetches Quick Picks: related songs based on a random seed from recent history.
-/// Returns up to 20 songs. The UI shows the first 4; "Play all" queues all 20.
 Future<List> getQuickPicks() async {
-  try {
-    List<String> seedsToTry = [];
-    if (userRecentlyPlayed.value.isNotEmpty) {
-      final topRecent = userRecentlyPlayed.value.take(10).toList()..shuffle();
-      seedsToTry.addAll(topRecent.map((e) => e['ytid']?.toString()).whereType<String>());
-    }
-
-    final trending = await getTrendingSongs();
-    if (trending.isNotEmpty) {
-      final shuffled = List.from(trending)..shuffle();
-      seedsToTry.addAll(shuffled.take(5).map((e) => e['ytid']?.toString()).whereType<String>());
-    }
-
-    for (final seedId in seedsToTry) {
-      if (seedId.isEmpty) continue;
-      try {
-        final song = await ytClient.videos.get(seedId);
-        final relatedSongs = await ytClient.videos.getRelatedVideos(song);
-        if (relatedSongs != null && relatedSongs.isNotEmpty) {
-          final results = relatedSongs
-              .where((s) => s.duration != null && s.duration!.inMinutes <= 15)
-              .take(20)
-              .map((s) => returnSongLayout(0, s))
-              .toList();
-          if (results.isNotEmpty) return results;
+    try {
+      List<Map> seedSongs = [];
+      
+      if (userRecentlyPlayed.value.isNotEmpty) {
+        // Get top 50 most played
+        final sortedByPlays = List.from(userRecentlyPlayed.value)
+          ..sort((a, b) {
+            final countA = (a['listeningCount'] ?? 0) as int;
+            final countB = (b['listeningCount'] ?? 0) as int;
+            return countB.compareTo(countA);
+          });
+        
+        // Get top 50 most recent
+        final topRecent = userRecentlyPlayed.value.take(50).toList();
+        
+        // Combine and shuffle, then take up to 4 distinct songs
+        final combined = [...sortedByPlays.take(50), ...topRecent];
+        combined.shuffle();
+        
+        final distinctYtids = <String>{};
+        for (final song in combined) {
+          if (song is Map && song['ytid'] != null) {
+            if (distinctYtids.add(song['ytid'].toString())) {
+              seedSongs.add(song);
+              if (seedSongs.length >= 4) break;
+            }
+          }
         }
-      } catch (e) {
-        // Ignore this specific seed's error and try the next one
-        continue;
       }
+
+      if (seedSongs.isNotEmpty) {
+        List<dynamic> finalMix = [];
+        
+        // 1. Add the seed songs themselves to the mix
+        finalMix.addAll(seedSongs);
+        
+        // 2. Fetch related songs for each seed concurrently
+        final relatedFutures = seedSongs.map((song) => _saavn.getRelatedSongs(song['ytid'].toString()));
+        final relatedResults = await Future.wait(relatedFutures);
+        
+        // 3. Add a few related songs from each seed
+        for (final relatedList in relatedResults) {
+          if (relatedList.isNotEmpty) {
+            final formatted = relatedList.take(6).map((s) => _saavn.formatSong(s)).toList();
+            finalMix.addAll(formatted);
+          }
+        }
+        
+        // 4. Shuffle the final mix and remove duplicates
+        finalMix.shuffle();
+        final distinctMix = <dynamic>[];
+        final seenIds = <String>{};
+        
+        for (final song in finalMix) {
+          final id = song['ytid']?.toString() ?? '';
+          if (id.isNotEmpty && seenIds.add(id)) {
+            distinctMix.add(song);
+          }
+          if (distinctMix.length >= 20) break;
+        }
+        
+        if (distinctMix.isNotEmpty) {
+          return distinctMix;
+        }
+      }
+
+      // Fallback: return trending songs as quick picks
+      return getTrendingSongs();
+    } catch (e, stackTrace) {
+      logger.log('Error in getQuickPicks', error: e, stackTrace: stackTrace);
+      return [];
     }
-    return [];
-  } catch (e, stackTrace) {
-    logger.log('Error in getQuickPicks', error: e, stackTrace: stackTrace);
-    return [];
   }
-}
 
 /// Returns the top 10 most-played songs from local history for Speed Dial.
 /// No network call needed — purely local Hive data.
@@ -543,84 +563,31 @@ Future<List<String>> getSearchSuggestions(String query) async {
   //   logger.log('Error in getSearchSuggestions:$e\n$stackTrace');
   // }
 
-  // Built-in implementation:
-
-  final suggestions = await ytClient.search.getQuerySuggestions(query);
-
-  final blockedKeywords = [
-    'lyrics',
-    'controversy',
-    'download',
-    'karaoke',
-    'ringtone',
-    'video',
-    'list',
-    'status',
-    'mp3',
-    'audio',
-  ];
-  final filteredSuggestions = suggestions.where((suggestion) {
-    final lower = suggestion.toLowerCase();
-    return !blockedKeywords.any((keyword) => lower.contains(keyword));
-  }).toList();
-
-  return filteredSuggestions;
+  // JioSaavn autocomplete:
+  final suggestions = await _saavn.getSearchSuggestions(query);
+  return suggestions;
 }
 
 Future<List<Map<String, int>>> getSkipSegments(String id) async {
-  try {
-    final res = await ProxyManager().getProxiedResponse(
-      Uri(
-        scheme: 'https',
-        host: 'sponsor.ajay.app',
-        path: '/api/skipSegments',
-        queryParameters: {
-          'videoID': id,
-          'category': [
-            'sponsor',
-            'selfpromo',
-            'interaction',
-            'intro',
-            'outro',
-            'music_offtopic',
-          ],
-          'actionType': 'skip',
-        },
-      ),
-    );
-    if (res.statusCode == 200 && res.body != 'Not Found') {
-      final data = jsonDecode(res.body);
-      final segments = data.map((obj) {
-        return Map.castFrom<String, dynamic, String, int>({
-          'start': obj['segment'].first.toInt(),
-          'end': obj['segment'].last.toInt(),
-        });
-      }).toList();
-      return List.castFrom<dynamic, Map<String, int>>(segments);
-    } else {
-      return [];
-    }
-  } catch (e, stackTrace) {
-    logger.log('Error in getSkipSegments', error: e, stackTrace: stackTrace);
-    return [];
-  }
+  return [];
 }
 
 List<dynamic> nextRecommendedSongs = [];
 
 Future<void> getSimilarSong(String songYtId) async {
   try {
-    final song = await ytClient.videos.get(songYtId);
-    final relatedSongs = await ytClient.videos.getRelatedVideos(song) ?? [];
+    var related = await _saavn.getRelatedSongs(songYtId);
+    
+    if (related.isEmpty) {
+      logger.log('No related songs found for $songYtId even after artist fallback.');
+      // DO NOT fallback to generic trending songs to avoid polluting niche playlists
+    }
 
-    if (relatedSongs.isNotEmpty) {
-      nextRecommendedSongs = relatedSongs
-          .where((s) => s.duration != null && s.duration!.inMinutes <= 15)
-          .take(20)
-          .map((s) => returnSongLayout(0, s))
+    if (related.isNotEmpty) {
+      nextRecommendedSongs = related
+          .take(50)
+          .map((s) => _saavn.formatSong(s))
           .toList();
-    } else {
-      logger.log('No related songs found for $songYtId');
     }
   } catch (e, stackTrace) {
     logger.log(
@@ -631,75 +598,18 @@ Future<void> getSimilarSong(String songYtId) async {
   }
 }
 
-/// Fetches the best available audio stream for a song.
-Future<AudioOnlyStreamInfo?> fetchBestAudioStream(String? songId) async {
-  try {
-    if (songId == null || songId.isEmpty) {
-      logger.log('fetchBestAudioStream: songId is null or empty');
-      return null;
-    }
-
-    final manifest = await _fetchStreamManifest(songId);
-    final audioStream = manifest?.audioOnly;
-    if (audioStream == null || audioStream.isEmpty) {
-      logger.log('fetchBestAudioStream: no audio streams for $songId');
-      return null;
-    }
-    return selectAudioOnlyStreamForQuality(audioStream.sortByBitrate());
-  } on TimeoutException catch (_) {
-    logger.log('fetchBestAudioStream request timed out for $songId');
-    return null;
-  } catch (e, stackTrace) {
-    logger.log(
-      'Error while fetching best audio stream',
-      error: e,
-      stackTrace: stackTrace,
-    );
-    return null;
-  }
-}
-
-/// Resolves a playable stream URL for a song (cached when possible).
+/// Resolves a playable stream URL for a song from JioSaavn.
+/// JioSaavn URLs are direct MP4 links — no proxy needed.
 Future<String?> fetchSongStreamUrl(String songId, bool isLive) async {
   try {
     if (songId.isEmpty) {
       logger.log('fetchSongStreamUrl: songId is empty');
       return null;
     }
-    if (isLive) {
-      final streamInfo = await ytClient.videos.streamsClient
-          .getHttpLiveStreamUrl(VideoId(songId));
-      return streamInfo;
-    }
 
-    const _cacheDuration = Duration(hours: 3);
-    final cacheKey = 'song_${songId}_${audioQualitySetting.value}_url';
-
-    // Try to get from cache
-    final cachedUrl = await _getCachedSongUrl(cacheKey, _cacheDuration);
-    if (cachedUrl != null) {
-      return cachedUrl;
-    }
-
-    // Get fresh URL
-    final manifest = await _fetchStreamManifest(songId);
-    final audioStreams = manifest?.audioOnly;
-    if (audioStreams == null || audioStreams.isEmpty) {
-      logger.log('fetchSongStreamUrl: no audio streams for $songId');
-      return null;
-    }
-
-    final selectedStream = selectAudioOnlyStreamForQuality(
-      audioStreams.sortByBitrate(),
-    );
-    final url = selectedStream.url.toString();
-
-    unawaited(addOrUpdateData<String>('cache', cacheKey, url));
-
-    return url;
-  } on TimeoutException catch (_) {
-    logger.log('fetchSongStreamUrl request timed out for $songId');
-    return null;
+    // For JioSaavn songs, we return a marker that tells the audio service
+    // to resolve the actual URL lazily (from the song's encrypted_media_url).
+    return 'jiosaavn_lazy_resolve';
   } catch (e, stackTrace) {
     logger.log(
       'Error in fetchSongStreamUrl for $songId:',
@@ -710,13 +620,27 @@ Future<String?> fetchSongStreamUrl(String songId, bool isLive) async {
   }
 }
 
+/// Resolve the actual direct stream URL for a JioSaavn song.
+/// Called lazily when playback actually starts.
+String? resolveJioSaavnStreamUrl(Map song) {
+  final encryptedUrl = song['encrypted_media_url']?.toString();
+  if (encryptedUrl == null || encryptedUrl.isEmpty) {
+    logger.log('resolveJioSaavnStreamUrl: no encrypted_media_url');
+    return null;
+  }
+  return _saavn.getSongStreamUrl(encryptedUrl);
+}
+
 Future<Map<String, dynamic>> getSongDetails(
   int songIndex,
   String songId,
 ) async {
   try {
-    final song = await ytClient.videos.get(songId);
-    return returnSongLayout(songIndex, song);
+    final song = await _saavn.getSongDetails(songId);
+    if (song != null) {
+      return _saavn.formatSong(song, index: songIndex);
+    }
+    throw Exception('Song not found: $songId');
   } catch (e, stackTrace) {
     logger.log(
       'Error while getting song details',
@@ -771,29 +695,28 @@ Future<bool> makeSongOffline(dynamic song) async {
 
     await audioFile.parent.create(recursive: true);
 
-    IOSink? fileStream;
     try {
-      final audioManifest = await fetchBestAudioStream(ytid);
-      if (audioManifest == null) {
-        logger.log('makeSongOffline: audioManifest is null for $ytid');
+      // Resolve the direct stream URL from JioSaavn
+      final streamUrl = resolveJioSaavnStreamUrl(offlineSong);
+      if (streamUrl == null || streamUrl.isEmpty) {
+        logger.log('makeSongOffline: no stream URL for $ytid');
         return false;
       }
 
-      final stream = ytClient.videos.streamsClient.get(audioManifest);
-      fileStream = audioFile.openWrite();
-      await stream.pipe(fileStream);
-      await fileStream.flush();
-      await fileStream.close();
-      fileStream = null;
+      // Download the MP4 audio file directly
+      final response = await http.get(Uri.parse(streamUrl));
+      if (response.statusCode != 200) {
+        logger.log('makeSongOffline: download failed with ${response.statusCode}');
+        return false;
+      }
+      await audioFile.writeAsBytes(response.bodyBytes);
     } catch (e, stackTrace) {
       logger.log(
         'Error downloading audio file',
         error: e,
         stackTrace: stackTrace,
       );
-      try {
-        await fileStream?.close();
-      } catch (_) {}
+      // file stream is no longer used
       if (await audioFile.exists()) {
         await audioFile.delete();
       }
@@ -914,7 +837,7 @@ Future<bool> removeSongFromOffline(dynamic songId) async {
 
 Future<File?> _downloadAndSaveArtworkFile(String url, String filePath) async {
   try {
-    final response = await ProxyManager().getProxiedResponse(Uri.parse(url));
+    final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
       final file = File(filePath);

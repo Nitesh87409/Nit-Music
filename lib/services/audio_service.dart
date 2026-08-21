@@ -9,6 +9,7 @@ import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/jiosaavn_api.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/map_utils.dart';
@@ -708,53 +709,57 @@ class MusifyAudioHandler extends BaseAudioHandler {
       return;
     }
 
-    unawaited(
-      Future.microtask(() async {
-        try {
-          final upcomingSongs = (_queueList.length - 1) - _currentQueueIndex;
-          logger.log('_backgroundAddSongsToQueue: upcomingSongs = $upcomingSongs');
-          if (upcomingSongs >= 20) {
-            return;
-          }
+    try {
+      final upcomingSongs = (_queueList.length - 1) - _currentQueueIndex;
+      logger.log('_backgroundAddSongsToQueue: upcomingSongs = $upcomingSongs');
+      if (upcomingSongs >= 15) {
+        return;
+      }
 
-          final baseSong = _getCurrentSongForRecommendations();
-          if (baseSong == null) {
-            logger.log('_backgroundAddSongsToQueue: baseSong is null');
-            return;
-          }
-          
-          final ytid = baseSong['ytid'];
-          logger.log('_backgroundAddSongsToQueue: fetching for ytid $ytid');
+      final baseSong = _getCurrentSongForRecommendations();
+      if (baseSong == null) {
+        logger.log('_backgroundAddSongsToQueue: baseSong is null');
+        return;
+      }
+      
+      final ytid = baseSong['ytid'];
+      logger.log('_backgroundAddSongsToQueue: fetching for ytid $ytid');
 
-          await getSimilarSong(ytid).timeout(
-            const Duration(seconds: 15),
-            onTimeout: () {
-              logger.log('Background song fetch timed out for $ytid');
-            },
-          );
+      await getSimilarSong(ytid).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          logger.log('Background song fetch timed out for $ytid');
+        },
+      );
 
-          logger.log('_backgroundAddSongsToQueue: nextRecommendedSongs length = ${nextRecommendedSongs.length}');
-          if (nextRecommendedSongs.isNotEmpty) {
-            final songsToAdd = List.from(nextRecommendedSongs);
-            nextRecommendedSongs.clear();
-            
-            final existingYtIds = _queueList.map((s) => s['ytid'].toString()).toSet();
-            final uniqueSongsToAdd = songsToAdd.where((s) => !existingYtIds.contains(s['ytid'].toString())).toList();
+      logger.log('_backgroundAddSongsToQueue: nextRecommendedSongs length = ${nextRecommendedSongs.length}');
+      if (nextRecommendedSongs.isNotEmpty) {
+        final songsToAdd = List.from(nextRecommendedSongs);
+        nextRecommendedSongs.clear();
+        
+        final existingYtIds = _queueList.map((s) => s['ytid'].toString()).toSet();
+        var uniqueSongsToAdd = songsToAdd.where((s) => !existingYtIds.contains(s['ytid'].toString())).toList();
 
-            logger.log('_backgroundAddSongsToQueue: uniqueSongsToAdd length = ${uniqueSongsToAdd.length}');
-            for (final songToAdd in uniqueSongsToAdd) {
-              await _insertRecommendedSong(songToAdd);
-            }
-          }
-        } catch (e, stackTrace) {
-          logger.log(
-            'Error in background song addition',
-            error: e,
-            stackTrace: stackTrace,
-          );
+        logger.log('_backgroundAddSongsToQueue: uniqueSongsToAdd length = ${uniqueSongsToAdd.length}');
+        
+        if (uniqueSongsToAdd.isEmpty) {
+          logger.log('_backgroundAddSongsToQueue: uniqueSongsToAdd is empty. Fetching trending songs as ultimate fallback');
+          final trending = await JioSaavnApi.instance.getTrendingSongs();
+          final formattedTrending = trending.map((s) => JioSaavnApi.instance.formatSong(s)).toList();
+          uniqueSongsToAdd = formattedTrending.where((s) => !existingYtIds.contains(s['ytid'].toString())).toList();
         }
-      }),
-    );
+
+        for (final songToAdd in uniqueSongsToAdd) {
+          await _insertRecommendedSong(songToAdd);
+        }
+      }
+    } catch (e, stackTrace) {
+      logger.log(
+        'Error in background song addition',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   Map? _getCurrentSongForRecommendations() {
@@ -1847,10 +1852,10 @@ class MusifyAudioHandler extends BaseAudioHandler {
         'Offline file missing for ${songData['ytid']}, switching to online',
       );
 
-      final onlineUrl = await fetchSongStreamUrl(
-        songData['ytid'],
-        songData['isLive'] ?? false,
-      );
+      final isLive = songData['isLive'] ?? false;
+      final onlineUrl = isLive 
+          ? await fetchSongStreamUrl(songData['ytid'], true)
+          : 'proxied_by_streamproxy';
 
       if (onlineUrl == null || onlineUrl.isEmpty) {
         logger.log('Failed to get song URL for ${songData['ytid']}');
@@ -1868,7 +1873,13 @@ class MusifyAudioHandler extends BaseAudioHandler {
       return _getOfflineSongUrl(song);
     }
 
-    return fetchSongStreamUrl(song['ytid'], song['isLive'] ?? false);
+    final isLive = song['isLive'] ?? false;
+    if (isLive) {
+      return fetchSongStreamUrl(song['ytid'], true);
+    }
+    
+    // For normal online songs, StreamProxy will lazily fetch the URL when playback starts
+    return 'proxied_by_streamproxy';
   }
 
   Future<String?> _getOfflineSongUrl(Map song) async {
@@ -2099,8 +2110,26 @@ class MusifyAudioHandler extends BaseAudioHandler {
         return AudioSource.file(songUrl, tag: tag);
       }
 
-      final uri = Uri.parse(songUrl);
-      final audioSource = AudioSource.uri(uri, tag: tag);
+      // For JioSaavn songs, resolve the actual stream URL from encrypted_media_url
+      String resolvedUrl = songUrl;
+      if (songUrl == 'jiosaavn_lazy_resolve' || songUrl == 'proxied_by_streamproxy') {
+        final decryptedUrl = resolveJioSaavnStreamUrl(song);
+        if (decryptedUrl == null || decryptedUrl.isEmpty) {
+          logger.log('buildAudioSource: failed to resolve JioSaavn URL for ${song['ytid']}');
+          return null;
+        }
+        resolvedUrl = decryptedUrl;
+      }
+
+      final uri = Uri.parse(resolvedUrl);
+      
+      final audioSource = AudioSource.uri(
+        uri,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+        },
+        tag: tag,
+      );
 
       if (!sponsorBlockSupport.value) {
         return audioSource;
@@ -2206,8 +2235,12 @@ class MusifyAudioHandler extends BaseAudioHandler {
         await _playFromQueue(0);
       } else if (playNextSongAutomatically.value &&
           _currentLoadingIndex == -1) {
-        // At end of queue with auto-play enabled - trigger background fetch
-        unawaited(_backgroundAddSongsToQueue());
+        // At end of queue with auto-play enabled - wait for background fetch
+        await _backgroundAddSongsToQueue();
+        // If songs were successfully added, play the next one
+        if (_currentQueueIndex < _queueList.length - 1) {
+          await _playFromQueue(_currentQueueIndex + 1);
+        }
       }
 
       _cleanupOldPreloadedSongs();

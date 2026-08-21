@@ -1,7 +1,6 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:musify/services/common_services.dart';
-import 'package:musify/services/settings_manager.dart';
 
 class AnimatedLikeButton extends StatefulWidget {
   final String audioId;

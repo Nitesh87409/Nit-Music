@@ -8,14 +8,14 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart' show logger;
 import 'package:musify/services/artist_service.dart';
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/io_service.dart';
+import 'package:musify/services/jiosaavn_api.dart';
 import 'package:musify/services/playlist_download_service.dart';
-import 'package:musify/services/proxy_manager.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/formatter.dart';
 import 'package:musify/utilities/playlist_utils.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 List<Map> playlists = [...playlistsDB, ...albumsDB];
 final userPlaylists = ValueNotifier<List<String>>(
@@ -131,12 +131,13 @@ final _latestPlaylistLikeUpdateTokens = <String, int>{};
 Future<List<dynamic>> getUserPlaylists() async {
   final futures = userPlaylists.value.map((playlistID) async {
     try {
-      final plist = await ytClient.playlists.get(playlistID);
+      final plist = await JioSaavnApi.instance.getPlaylist(playlistID);
+      if (plist == null) throw Exception('Playlist not found');
       return {
-        'ytid': plist.id.toString(),
-        'title': plist.title,
-        'image': null,
-        'source': 'user-youtube',
+        'ytid': playlistID,
+        'title': plist['title'],
+        'image': plist['image'],
+        'source': 'jiosaavn',
         'list': [],
       };
     } catch (e, stackTrace) {
@@ -178,10 +179,15 @@ Future<String> addUserPlaylist(String input, BuildContext context) async {
       return '${context.l10n!.playlistAlreadyExists}!';
     }
 
-    final playlist = await ytClient.playlists.get(playlistId);
-    if (playlist.title.isEmpty) {
-      return '${context.l10n!.invalidYouTubePlaylist}!';
+    final playlist = await JioSaavnApi.instance.getPlaylist(playlistId);
+    if (playlist == null) {
+      showToast(context, 'Playlist not found!');
+      return 'false';
     }
+    
+    // In JioSaavn, we don't fetch video counts the same way
+    // For now we just add it to userPlaylists
+
 
     userPlaylists.value = [...userPlaylists.value, playlistId];
     unawaited(addOrUpdateData<List>('user', 'playlists', userPlaylists.value));
@@ -848,40 +854,16 @@ Future<List> getPlaylists({
 
     final searchTerm = type == 'album' ? '$query album' : query;
 
-    late final Iterable searchResultsIterable;
+    late final List<dynamic> searchResultsIterable;
     try {
-      searchResultsIterable = await ytClient.search.searchContent(
-        searchTerm,
-        filter: TypeFilters.playlist,
-      );
+      searchResultsIterable = await JioSaavnApi.instance.searchPlaylists(searchTerm);
     } catch (e, st) {
       logger.log(
-        'Error while searching online songs:',
+        'Error while searching online playlists:',
         error: e,
         stackTrace: st,
       );
-      if (useProxy.value) {
-        final proxyYt = await ProxyManager().getYoutubeExplodeClient();
-        if (proxyYt != null) {
-          try {
-            searchResultsIterable = await proxyYt.search.searchContent(
-              searchTerm,
-              filter: TypeFilters.playlist,
-            );
-          } catch (e2, st2) {
-            logger.log('Proxy search failed:', error: e2, stackTrace: st2);
-            searchResultsIterable = <dynamic>[];
-          } finally {
-            try {
-              proxyYt.close();
-            } catch (_) {}
-          }
-        } else {
-          searchResultsIterable = <dynamic>[];
-        }
-      } else {
-        searchResultsIterable = <dynamic>[];
-      }
+      searchResultsIterable = <dynamic>[];
     }
 
     final existingYtIds = onlinePlaylists.value
@@ -889,16 +871,15 @@ Future<List> getPlaylists({
         .toSet();
 
     final newPlaylists = searchResultsIterable
-        .whereType<SearchPlaylist>()
         .map((playlist) {
           final playlistMap = {
-            'ytid': playlist.id.toString(),
-            'title': playlist.title,
-            'image': playlist.thumbnails.first.url.toString(),
-            'source': 'youtube',
+            'ytid': playlist['id']?.toString() ?? '',
+            'title': playlist['title']?.toString() ?? '',
+            'image': playlist['image']?.toString() ?? '',
+            'source': 'jiosaavn',
             'list': [],
           };
-          if (!existingYtIds.contains(playlistMap['ytid'])) {
+          if (!existingYtIds.contains(playlistMap['ytid']) && playlistMap['ytid'] != '') {
             existingYtIds.add(playlistMap['ytid'].toString());
             return playlistMap;
           }
@@ -991,6 +972,7 @@ int findPlaylistIndexByYtId(String ytid) {
 Future<Map?> getPlaylistInfoForWidget(
   dynamic id, {
   bool isArtist = false,
+  bool isAlbum = false,
   String? artistName,
   String? artistImage,
   String? sourceSongId,
@@ -1025,7 +1007,7 @@ Future<Map?> getPlaylistInfoForWidget(
   final offlinePlaylist = _findOfflinePlaylist(normalizedId);
   if (offlinePlaylist != null) return offlinePlaylist;
 
-  return _fetchYouTubePlaylist(normalizedId);
+  return _fetchYouTubePlaylist(normalizedId, isAlbum: isAlbum);
 }
 
 Future<Map<String, dynamic>?> resolveArtistInfoForWidget(
@@ -1097,7 +1079,7 @@ Map? _findPlaylistById(Iterable<dynamic> playlists, String id) {
   return null;
 }
 
-Future<Map?> _fetchYouTubePlaylist(String id) async {
+Future<Map?> _fetchYouTubePlaylist(String id, {bool isAlbum = false}) async {
   // 1. Local DB / in-memory caches (no network).
   var playlist = _findPlaylistById(playlists, id);
 
@@ -1113,12 +1095,17 @@ Future<Map?> _fetchYouTubePlaylist(String id) async {
   // 4. Fetch from YouTube as a last resort.
   if (playlist == null) {
     try {
-      final ytPlaylist = await ytClient.playlists.get(id);
+      final ytPlaylist = isAlbum 
+          ? await JioSaavnApi.instance.getAlbum(id)
+          : await JioSaavnApi.instance.getPlaylist(id);
+          
+      if (ytPlaylist == null) throw Exception('Playlist/Album not found');
       playlist = {
-        'ytid': ytPlaylist.id.toString(),
-        'title': ytPlaylist.title,
-        'image': ytPlaylist.thumbnails.mediumResUrl,
-        'source': 'user-youtube',
+        'ytid': ytPlaylist['id']?.toString() ?? id,
+        'title': ytPlaylist['title'],
+        'image': ytPlaylist['image'],
+        'source': 'jiosaavn',
+        'isAlbum': isAlbum,
         'list': [],
       };
       _updateOnlineCache(playlist);
@@ -1143,12 +1130,10 @@ Future<Map?> _fetchYouTubePlaylist(String id) async {
 
 Future<List> _loadSongsForPlaylist(Map playlist) async {
   try {
-    final playlistImage = playlist['isAlbum'] == true
-        ? playlist['image'] as String?
-        : null;
+    final isAlbum = playlist['isAlbum'] == true;
     final songs = await getSongsFromPlaylist(
       playlist['ytid'],
-      playlistImage: playlistImage,
+      isAlbum: isAlbum,
     );
     if (!playlists.contains(playlist)) {
       playlists.add(playlist);
@@ -1166,20 +1151,24 @@ Future<List> _loadSongsForPlaylist(Map playlist) async {
 
 Future<List> getSongsFromPlaylist(
   dynamic playlistId, {
-  String? playlistImage,
+  bool isAlbum = false,
 }) async {
   final songList = await getData('cache', 'playlistSongs$playlistId') ?? [];
 
   if (songList.isEmpty) {
-    await for (final song in ytClient.playlists.getVideos(playlistId)) {
-      songList.add(
-        returnSongLayout(songList.length, song, playlistImage: playlistImage),
+    try {
+      final saavn = JioSaavnApi.instance;
+      final songs = isAlbum 
+          ? await saavn.getAlbumSongs(playlistId.toString())
+          : await saavn.getPlaylistSongs(playlistId.toString());
+      songList.addAll(songs.map((s) => saavn.formatSong(s)));
+      
+      unawaited(
+        addOrUpdateData<List>('cache', 'playlistSongs$playlistId', songList),
       );
+    } catch (e) {
+      logger.log('Error fetching JioSaavn playlist: $e');
     }
-
-    unawaited(
-      addOrUpdateData<List>('cache', 'playlistSongs$playlistId', songList),
-    );
   }
 
   return songList;
@@ -1193,20 +1182,38 @@ Future updatePlaylistList(BuildContext context, String playlistId) async {
   }
 
   try {
-    final songList = [];
-    await for (final song in ytClient.playlists.getVideos(playlistId)) {
-      songList.add(returnSongLayout(songList.length, song));
-    }
+    final saavn = JioSaavnApi.instance;
+    final isAlbum = userLikedPlaylists.value[index]['isAlbum'] == true;
+    final songs = isAlbum 
+        ? await saavn.getAlbumSongs(playlistId)
+        : await saavn.getPlaylistSongs(playlistId);
+    final songList = songs.map((s) => saavn.formatSong(s)).toList();
 
-    playlists[index]['list'] = songList;
     unawaited(
       addOrUpdateData<List>('cache', 'playlistSongs$playlistId', songList),
     );
-    showToast(context, context.l10n!.playlistUpdated);
-    return playlists[index];
+
+    final updatedPlaylist = Map<String, dynamic>.from(
+      userLikedPlaylists.value[index] as Map,
+    );
+    updatedPlaylist['isUpToDate'] = true;
+
+    final newList = List.from(userLikedPlaylists.value);
+    newList[index] = updatedPlaylist;
+    userLikedPlaylists.value = List<Map<dynamic, dynamic>>.from(newList);
+
+    unawaited(
+      addOrUpdateData<List>(
+        'user',
+        'likedPlaylists',
+        userLikedPlaylists.value,
+      ),
+    );
+
+    return songList;
   } catch (e, stackTrace) {
     logger.log(
-      'Error updating playlist list for $playlistId',
+      'Error updating playlist $playlistId',
       error: e,
       stackTrace: stackTrace,
     );

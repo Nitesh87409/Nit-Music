@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
@@ -110,7 +111,7 @@ class NowPlayingControls extends StatelessWidget {
               ),
             ),
             if (!isCompact) const Spacer(),
-            if (!isCompact) const _StaticWaveform(),
+            if (!isCompact) const _AnimatedWaveform(),
             if (!isCompact) const SizedBox(height: 16),
             ConstrainedBox(
               constraints: BoxConstraints(
@@ -324,7 +325,7 @@ class PlayerControlButtons extends StatelessWidget {
                                 SizedBox(width: buttonSpacing),
                                 PlaybackIconButton(
                                   iconColor: colorScheme.onPrimary,
-                                  backgroundColor: const Color(0xFF8B5CF6),
+                                  backgroundColor: colorScheme.primary,
                                   iconSize: controlIconSize,
                                   padding: playPadding,
                                 ),
@@ -407,7 +408,7 @@ class PlayerControlButtons extends StatelessWidget {
           padding: buttonPadding,
           style: IconButton.styleFrom(
             backgroundColor: value
-                ? const Color(0xFF8B5CF6)
+                ? colorScheme.primary
                 : colorScheme.surfaceContainerHighest,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -458,7 +459,7 @@ class PlayerControlButtons extends StatelessWidget {
               padding: buttonPadding,
               style: IconButton.styleFrom(
                 backgroundColor: isActive
-                    ? const Color(0xFF8B5CF6)
+                    ? colorScheme.primary
                     : colorScheme.surfaceContainerHighest,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -486,25 +487,70 @@ class PlayerControlButtons extends StatelessWidget {
   }
 }
 
-class _StaticWaveform extends StatelessWidget {
-  const _StaticWaveform();
+class _AnimatedWaveform extends StatefulWidget {
+  const _AnimatedWaveform();
+
+  @override
+  State<_AnimatedWaveform> createState() => _AnimatedWaveformState();
+}
+
+class _AnimatedWaveformState extends State<_AnimatedWaveform> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  final heights = [5.0, 10.0, 15.0, 25.0, 15.0, 20.0, 35.0, 25.0, 45.0, 30.0, 20.0, 10.0, 15.0, 25.0, 35.0, 25.0, 15.0, 30.0, 20.0, 15.0, 10.0, 5.0];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final heights = [5.0, 10.0, 15.0, 25.0, 15.0, 20.0, 35.0, 25.0, 45.0, 30.0, 20.0, 10.0, 15.0, 25.0, 35.0, 25.0, 15.0, 30.0, 20.0, 15.0, 10.0, 5.0];
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: heights.map((h) {
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          width: 3,
-          height: h,
-          decoration: BoxDecoration(
-            color: const Color(0xFF8B5CF6).withOpacity(0.6),
-            borderRadius: BorderRadius.circular(2),
-          ),
+    final colorScheme = Theme.of(context).colorScheme;
+    return StreamBuilder<PlaybackState>(
+      stream: audioHandler.playbackState,
+      builder: (context, snapshot) {
+        final playing = snapshot.data?.playing ?? false;
+        if (playing && !_controller.isAnimating) {
+          _controller.repeat(reverse: true);
+        } else if (!playing && _controller.isAnimating) {
+          _controller.stop();
+        }
+
+        return AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return SizedBox(
+              height: 35,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(heights.length, (i) {
+                  final baseHeight = heights[i] * 0.5; // smaller height
+                  final animValue = playing ? math.sin((_controller.value * math.pi * 2) + (i * 0.5)) * 0.5 + 0.5 : 0.0;
+                  final currentHeight = baseHeight + (baseHeight * animValue);
+
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                    width: 2.5,
+                    height: currentHeight,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(1.25),
+                    ),
+                  );
+                }),
+              ),
+            );
+          },
         );
-      }).toList(),
+      },
     );
   }
 }

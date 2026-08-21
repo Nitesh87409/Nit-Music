@@ -105,12 +105,6 @@ class StreamClient {
             );
           }
 
-          final response = await _httpClient.head(streams.first.url);
-          if (response.statusCode == 403) {
-            throw YoutubeExplodeException(
-              'Video $videoId returned 403 (stream: ${streams.first.tag})',
-            );
-          }
           uniqueStreams.addAll(streams);
         });
       } catch (e, s) {
@@ -168,8 +162,8 @@ class StreamClient {
   /// Gets the actual stream which is identified by the specified metadata.
   /// Usually this downloads the bytes of the stream.
   /// For HLS streams all the fragments are concatenated into a single stream.
-  Stream<List<int>> get(StreamInfo streamInfo) =>
-      _httpClient.getStream(streamInfo, streamClient: this);
+  Stream<List<int>> get(StreamInfo streamInfo, {int start = 0}) =>
+      _httpClient.getStream(streamInfo, start: start, streamClient: this);
 
   Stream<StreamInfo> _getStreams(VideoId videoId,
       {required YoutubeApiClient ytClient,

@@ -54,7 +54,7 @@ class GenericGridPage extends StatelessWidget {
                               color: Theme.of(context).colorScheme.surfaceContainerHighest,
                               image: imageUrl.isNotEmpty
                                   ? DecorationImage(
-                                      image: CachedNetworkImageProvider(imageUrl),
+                                      image: CachedNetworkImageProvider(imageUrl, maxWidth: 400, maxHeight: 400),
                                       fit: BoxFit.cover,
                                     )
                                   : null,

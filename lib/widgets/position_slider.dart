@@ -40,23 +40,34 @@ class _PositionSliderState extends State<PositionSlider> {
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Slider(
-              value: currentValue.clamp(0.0, maxDuration),
-              onChanged: (value) {
-                setState(() {
-                  _isDragging = true;
-                  _dragValue = value;
-                });
-              },
-              onChangeEnd: (value) {
-                audioHandler.seek(Duration(seconds: value.toInt()));
-                setState(() {
-                  _isDragging = false;
-                });
-              },
-              max: maxDuration,
-              semanticFormatterCallback: (value) =>
-                  formatDuration(value.toInt()),
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 2.0,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14.0),
+                activeTrackColor: Theme.of(context).colorScheme.primary,
+                inactiveTrackColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                thumbColor: Theme.of(context).colorScheme.primary,
+                overlayColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              ),
+              child: Slider(
+                value: currentValue.clamp(0.0, maxDuration),
+                onChanged: (value) {
+                  setState(() {
+                    _isDragging = true;
+                    _dragValue = value;
+                  });
+                },
+                onChangeEnd: (value) {
+                  audioHandler.seek(Duration(seconds: value.toInt()));
+                  setState(() {
+                    _isDragging = false;
+                  });
+                },
+                max: maxDuration,
+                semanticFormatterCallback: (value) =>
+                    formatDuration(value.toInt()),
+              ),
             ),
             _buildPositionRow(context, _positionData),
           ],
@@ -72,7 +83,8 @@ class _PositionSliderState extends State<PositionSlider> {
     final durationText = formatDuration(positionData.duration.inSeconds);
     final textStyle = TextStyle(
       fontSize: 12,
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w500,
+      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.9),
     );
 
     return Padding(

@@ -22,9 +22,9 @@ class YoutubeHttpClient extends http.BaseClient {
 
   bool get closed => _closed;
 
-  static const Map<String, String> defaultHeaders = {
+  static Map<String, String> defaultHeaders = {
     'user-agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.18 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
     'cookie': 'CONSENT=YES+cb',
     'accept':
         'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
@@ -347,10 +347,12 @@ class YoutubeHttpClient extends http.BaseClient {
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     if (_closed) throw HttpClientClosedException();
 
-    // Apply default headers if they are not already present
+    // Apply default headers if they are not already present (case-insensitive check)
     headers.forEach((key, value) {
-      if (request.headers[key] == null) {
-        request.headers[key] = headers[key]!;
+      final lowercaseKey = key.toLowerCase();
+      final hasKey = request.headers.keys.any((k) => k.toLowerCase() == lowercaseKey);
+      if (!hasKey) {
+        request.headers[key] = value;
       }
     });
 
@@ -359,6 +361,6 @@ class YoutubeHttpClient extends http.BaseClient {
     if (request is http.Request) {
       _logger.finer('Request body: ${request.body}');
     }
-    return _httpClient.send(request);
+    return _httpClient.send(request).timeout(const Duration(seconds: 8));
   }
 }

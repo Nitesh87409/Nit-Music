@@ -3,16 +3,30 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_flip_card/flutter_flip_card.dart';
 import 'package:musify/main.dart';
-import 'package:musify/widgets/now_playing/bottom_actions_row.dart';
+import 'package:musify/utilities/palette_cache.dart';
+
+import 'package:musify/widgets/now_playing/now_playing_options_menu.dart';
 import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
 import 'package:musify/widgets/queue_list_view.dart';
+import 'package:musify/utilities/flutter_bottom_sheet.dart';
 
 import 'dart:async';
 import 'package:palette_generator/palette_generator.dart';
 
 class NowPlayingPage extends StatefulWidget {
-  const NowPlayingPage({super.key});
+  const NowPlayingPage({
+    super.key,
+    this.initialDominantColor,
+    this.initialVibrantColor,
+    this.isOverlay = false,
+    this.onClose,
+  });
+
+  final Color? initialDominantColor;
+  final Color? initialVibrantColor;
+  final bool isOverlay;
+  final VoidCallback? onClose;
 
   @override
   State<NowPlayingPage> createState() => _NowPlayingPageState();
@@ -27,8 +41,30 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
   @override
   void initState() {
     super.initState();
+    _dominantColor = widget.initialDominantColor;
+    _vibrantColor = widget.initialVibrantColor;
+
+    final currentItem = audioHandler.mediaItem.value;
+    if (currentItem != null && PaletteCache.hasColorsFor(currentItem.id)) {
+      _dominantColor ??= PaletteCache.dominantColor;
+      _vibrantColor ??= PaletteCache.vibrantColor;
+    }
+
     _mediaItemSub = audioHandler.mediaItem.listen((item) {
-      _updatePalette(item);
+      if (item == null) return;
+      
+      if (PaletteCache.hasColorsFor(item.id)) {
+        if (mounted) {
+          setState(() {
+            _dominantColor = PaletteCache.dominantColor;
+            _vibrantColor = PaletteCache.vibrantColor;
+          });
+        }
+      } else {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) _updatePalette(item);
+        });
+      }
     });
   }
 
@@ -55,6 +91,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
           _dominantColor = palette.dominantColor?.color;
           _vibrantColor = palette.vibrantColor?.color ?? palette.dominantColor?.color;
         });
+        PaletteCache.update(item.id, _dominantColor, _vibrantColor);
       }
     } catch (e) {
       // ignore
@@ -98,6 +135,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
           Positioned.fill(
             child: SafeArea(
               child: StreamBuilder<MediaItem?>(
+                initialData: audioHandler.mediaItem.value,
                 stream: audioHandler.mediaItem,
                 builder: (context, snapshot) {
                   if (snapshot.data == null || !snapshot.hasData) {
@@ -107,22 +145,43 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                     final backgroundColor = _vibrantColor ?? _dominantColor ?? colorScheme.surface;
                     final isDark = ThemeData.estimateBrightnessForColor(backgroundColor) == Brightness.dark;
                     
-                    // Always use default (white) onSurface for readability, only change primary
-                    final dynamicColorScheme = colorScheme.copyWith(
-                      primary: isDark ? const Color(0xFFB490FF) : const Color(0xFF7C3AED),
+                    final dynamicPrimaryColor = _vibrantColor ?? _dominantColor ?? colorScheme.primary;
+                    
+                    // Create a completely new color scheme based on the background's brightness
+                    // so text colors (onSurface) automatically contrast properly with the background!
+                    final dynamicColorScheme = ColorScheme.fromSeed(
+                      seedColor: dynamicPrimaryColor,
+                      brightness: isDark ? Brightness.dark : Brightness.light,
                     );
 
                     return GestureDetector(
+                      behavior: HitTestBehavior.translucent,
                       onVerticalDragEnd: (details) {
-                        if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
-                          Navigator.pop(context);
+                        if (details.primaryVelocity != null) {
+                          if (details.primaryVelocity! > 300) {
+                            if (widget.onClose != null) {
+                              widget.onClose!();
+                            } else {
+                              Navigator.pop(context);
+                            }
+                          } else if (details.primaryVelocity! < -300) {
+                            showCustomBottomSheet(
+                              context,
+                              Theme(
+                                data: theme.copyWith(colorScheme: dynamicColorScheme),
+                                child: const QueueWidget(isBottomSheet: true),
+                              ),
+                              backgroundColor: dynamicPrimaryColor.withValues(alpha: 0.15),
+                              useScrollView: false,
+                            );
+                          }
                         }
                       },
                       child: Theme(
                         data: theme.copyWith(colorScheme: dynamicColorScheme),
                         child: Column(
                           children: [
-                            _buildAppBar(context, dynamicColorScheme),
+                            _buildAppBar(context, dynamicColorScheme, metadata),
                             Expanded(
                               child: isLargeScreen
                                   ? _DesktopLayout(
@@ -156,37 +215,24 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     );
   }
 
-  Widget _buildAppBar(BuildContext context, ColorScheme colorScheme) {
+  Widget _buildAppBar(BuildContext context, ColorScheme colorScheme, MediaItem metadata) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Hero(
-            tag: 'collapse_button',
-            flightShuttleBuilder: (flightContext, animation, flightDirection, fromHeroContext, toHeroContext) {
-              final Widget hero = flightDirection == HeroFlightDirection.push
-                  ? toHeroContext.widget
-                  : fromHeroContext.widget;
-              return AnimatedBuilder(
-                animation: animation,
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: Curves.easeOut.transform(animation.value),
-                    child: hero,
-                  );
-                },
-              );
-            },
-            child: IconButton(
-              iconSize: 24,
-              icon: const Icon(FluentIcons.chevron_down_24_regular),
-              style: IconButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                shape: const CircleBorder(),
-                padding: const EdgeInsets.all(12),
-              ),
-              onPressed: () => Navigator.pop(context),
+          IconButton(
+            iconSize: 24,
+            icon: const Icon(FluentIcons.chevron_down_24_regular),
+            style: IconButton.styleFrom(
+              shape: const CircleBorder(),
+              padding: const EdgeInsets.all(12),
             ),
+            onPressed: widget.onClose ?? () => Navigator.pop(context),
+          ),
+          NowPlayingOptionsMenu(
+            audioId: metadata.extras?['ytid'],
+            metadata: metadata,
           ),
         ],
       ),
@@ -242,13 +288,6 @@ class _DesktopLayout extends StatelessWidget {
                       metadata: metadata,
                     ),
                   ),
-                BottomActionsRow(
-                  audioId: metadata.extras?['ytid'],
-                  metadata: metadata,
-                  iconSize: adjustedMiniIconSize,
-                  isLargeScreen: true,
-                  lyricsController: lyricsController,
-                ),
                 const SizedBox(height: 16),
               ],
             ),
@@ -316,13 +355,6 @@ class _MobileLayout extends StatelessWidget {
                 metadata: metadata,
               ),
             ),
-          BottomActionsRow(
-            audioId: metadata.extras?['ytid'],
-            metadata: metadata,
-            iconSize: adjustedMiniIconSize,
-            isLargeScreen: isLargeScreen,
-            lyricsController: lyricsController,
-          ),
           const SizedBox(height: 16),
         ],
       ),
@@ -361,13 +393,6 @@ class _MobileLayout extends StatelessWidget {
                       metadata: metadata,
                     ),
                   ),
-                BottomActionsRow(
-                  audioId: metadata.extras?['ytid'],
-                  metadata: metadata,
-                  iconSize: adjustedMiniIconSize,
-                  isLargeScreen: isLargeScreen,
-                  lyricsController: lyricsController,
-                ),
                 const SizedBox(height: 8),
               ],
             ),

@@ -4,12 +4,12 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:musify/extensions/l10n.dart';
-import 'package:musify/services/artist_service.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/utilities/artwork_provider.dart';
+import 'package:musify/utilities/formatter.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/offline_playlist_dialogs.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
@@ -586,7 +586,8 @@ class PlaylistBar extends StatelessWidget {
         return;
       }
 
-      context.push('/home/playlist/$_resolvedPlaylistId');
+      final basePath = _routeBasePath(context);
+      context.push('$basePath/playlist/$_resolvedPlaylistId', extra: playlistData);
     };
   }
 

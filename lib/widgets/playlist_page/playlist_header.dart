@@ -10,6 +10,7 @@ class PlaylistHeader extends StatelessWidget {
     super.key,
     this.isAlbum,
     this.isArtist = false,
+    this.accentColor,
   });
 
   final Widget image;
@@ -17,6 +18,62 @@ class PlaylistHeader extends StatelessWidget {
   final int songsLength;
   final bool? isAlbum;
   final bool isArtist;
+  final Color? accentColor;
+
+  /// Static helper to build just the chips row (used by parallax header).
+  static Widget buildChipsOnly({
+    required BuildContext context,
+    required int songsLength,
+    required bool isArtist,
+    bool? isAlbum,
+    Color? accentColor,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final chipBg = accentColor?.withValues(alpha: 0.25) ?? colorScheme.primaryContainer;
+    final chipFg = accentColor != null
+        ? Colors.white.withValues(alpha: 0.9)
+        : colorScheme.onPrimaryContainer;
+    final countBg = accentColor?.withValues(alpha: 0.15) ?? colorScheme.secondaryContainer;
+    final countFg = accentColor != null
+        ? Colors.white.withValues(alpha: 0.8)
+        : colorScheme.onSecondaryContainer;
+
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      children: [
+        if (isArtist)
+          _Chip(
+            icon: FluentIcons.person_16_regular,
+            label: context.l10n!.artist,
+            color: chipBg,
+            onColor: chipFg,
+            theme: theme,
+          )
+        else if (isAlbum != null)
+          _Chip(
+            icon: isAlbum!
+                ? FluentIcons.cd_16_regular
+                : FluentIcons.apps_list_24_regular,
+            label: isAlbum!
+                ? context.l10n!.album
+                : context.l10n!.playlist,
+            color: chipBg,
+            onColor: chipFg,
+            theme: theme,
+          ),
+        _Chip(
+          icon: FluentIcons.text_bullet_list_24_filled,
+          label: '$songsLength ${context.l10n!.songs}',
+          color: countBg,
+          onColor: countFg,
+          theme: theme,
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,38 +111,12 @@ class PlaylistHeader extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 10),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            children: [
-              if (isArtist)
-                _Chip(
-                  icon: FluentIcons.person_16_regular,
-                  label: context.l10n!.artist,
-                  color: colorScheme.primaryContainer,
-                  onColor: colorScheme.onPrimaryContainer,
-                  theme: theme,
-                )
-              else if (isAlbum != null)
-                _Chip(
-                  icon: isAlbum!
-                      ? FluentIcons.cd_16_regular
-                      : FluentIcons.apps_list_24_regular,
-                  label: isAlbum!
-                      ? context.l10n!.album
-                      : context.l10n!.playlist,
-                  color: colorScheme.primaryContainer,
-                  onColor: colorScheme.onPrimaryContainer,
-                  theme: theme,
-                ),
-              _Chip(
-                icon: FluentIcons.text_bullet_list_24_filled,
-                label: '$songsLength ${context.l10n!.songs}',
-                color: colorScheme.secondaryContainer,
-                onColor: colorScheme.onSecondaryContainer,
-                theme: theme,
-              ),
-            ],
+          buildChipsOnly(
+            context: context,
+            songsLength: songsLength,
+            isAlbum: isAlbum,
+            isArtist: isArtist,
+            accentColor: accentColor,
           ),
           const SizedBox(height: 20),
         ],

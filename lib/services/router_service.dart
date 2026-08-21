@@ -17,7 +17,6 @@ import 'package:musify/screens/generic_grid_page.dart';
 import 'package:musify/screens/user_songs_page.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/settings_manager.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:musify/widgets/offline_search_placeholder.dart';
 
 class NavigationManager {
@@ -163,6 +162,7 @@ class NavigationManager {
                 pageBuilder: (context, state) => _pushPage(
                   child: PlaylistPage(
                     playlistId: state.pathParameters['playlistId'],
+                    playlistData: _extraAsMap(state.extra),
                   ),
                   state: state,
                 ),
@@ -247,6 +247,16 @@ class NavigationManager {
                   state: state,
                 ),
               ),
+              GoRoute(
+                path: 'playlist/:playlistId',
+                pageBuilder: (context, state) => _pushPage(
+                  child: PlaylistPage(
+                    playlistId: state.pathParameters['playlistId'],
+                    playlistData: _extraAsMap(state.extra),
+                  ),
+                  state: state,
+                ),
+              ),
             ],
           ),
         ],
@@ -278,6 +288,16 @@ class NavigationManager {
                       state.pathParameters['artistId'],
                     ),
                     artistData: _extraAsMap(state.extra),
+                  ),
+                  state: state,
+                ),
+              ),
+              GoRoute(
+                path: 'playlist/:playlistId',
+                pageBuilder: (context, state) => _pushPage(
+                  child: PlaylistPage(
+                    playlistId: state.pathParameters['playlistId'],
+                    playlistData: _extraAsMap(state.extra),
                   ),
                   state: state,
                 ),

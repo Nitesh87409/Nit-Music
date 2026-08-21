@@ -4,6 +4,8 @@ import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:musify/main.dart';
+import 'package:musify/utilities/palette_cache.dart';
+
 import 'package:musify/models/full_player_state.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/screens/now_playing_page.dart';
@@ -28,10 +30,12 @@ final Stream<FullPlayerState> _fullPlayerStateStream =
         .asBroadcastStream();
 
 class MiniPlayer extends StatelessWidget {
-  const MiniPlayer({super.key});
+  final VoidCallback? onTap;
+
+  const MiniPlayer({this.onTap, super.key});
 
   static const double playerHeight = 72;
-  static const double _borderRadius = 36;
+  static const double _borderRadius = 16;
   static const double _artworkSize = 52;
   static const double _artworkRadius = 14;
 
@@ -62,6 +66,7 @@ class MiniPlayer extends StatelessWidget {
                 final hasPrevious = (state.playbackState.queueIndex ?? 0) > 0;
 
               return _MiniPlayerBody(
+                onTap: onTap,
                 colorScheme: colorScheme,
                 metadata: metadata,
                 state: state,
@@ -78,6 +83,7 @@ class MiniPlayer extends StatelessWidget {
 
 class _MiniPlayerBody extends StatefulWidget {
   const _MiniPlayerBody({
+    this.onTap,
     required this.colorScheme,
     required this.metadata,
     required this.state,
@@ -85,6 +91,7 @@ class _MiniPlayerBody extends StatefulWidget {
     required this.hasNext,
   });
 
+  final VoidCallback? onTap;
   final ColorScheme colorScheme;
   final MediaItem metadata;
   final FullPlayerState state;
@@ -150,6 +157,7 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
           _dominantColor = palette.dominantColor?.color;
           _vibrantColor = palette.vibrantColor?.color ?? palette.dominantColor?.color;
         });
+        PaletteCache.update(item.id, _dominantColor, _vibrantColor);
       }
     } catch (e) {
       // ignore
@@ -166,7 +174,11 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
 
   void _handleVerticalDrag(DragUpdateDetails details) {
     if ((details.primaryDelta ?? 0) < -_dragThresholdForNavigation) {
-      _navigateToNowPlaying();
+      if (widget.onTap != null) {
+        widget.onTap!();
+      } else {
+        _navigateToNowPlaying();
+      }
     } else if ((details.primaryDelta ?? 0) > _dragThresholdForNavigation) {
       setState(() => _slideOffset = const Offset(0, 1.5));
       Future.delayed(const Duration(milliseconds: 300), () {
@@ -211,13 +223,10 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
     final isDark = ThemeData.estimateBrightnessForColor(backgroundColor) == Brightness.dark;
     
     final colorScheme = defaultColorScheme.copyWith(
-      secondary: isDark ? Colors.white : Colors.black87,
-      onSurfaceVariant: isDark ? Colors.white70 : Colors.black54,
-      onSurface: isDark ? Colors.white : Colors.black87,
-      primary: isDark ? const Color(0xFFB490FF) : const Color(0xFF7C3AED),
-      surfaceContainerHighest: isDark ? Colors.white24 : Colors.black12,
-      outlineVariant: isDark ? Colors.white24 : Colors.black12,
-      shadow: isDark ? Colors.black : Colors.transparent,
+      secondary: Colors.white,
+      onSurfaceVariant: Colors.white70,
+      onSurface: Colors.white,
+      primary: _vibrantColor ?? _dominantColor ?? defaultColorScheme.primary,
     );
 
     final totalDuration = state.position.duration > Duration.zero
@@ -250,102 +259,57 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
             onTapUp: (_) => _animationController.reverse(),
             onTapCancel: () => _animationController.reverse(),
             onVerticalDragUpdate: _handleVerticalDrag,
-            onTap: _navigateToNowPlaying,
+            onTap: () {
+              if (widget.onTap != null) {
+                widget.onTap!();
+              } else {
+                _navigateToNowPlaying();
+              }
+            },
             child: SizedBox(
               height: MiniPlayer.playerHeight,
-              child: Stack(
-                children: [
-                  // Removed player_background Hero to avoid snapping
-                  ClipRRect(
-                      borderRadius: BorderRadius.circular(MiniPlayer._borderRadius),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                        child: Container(
-                          height: MiniPlayer.playerHeight,
-                          decoration: BoxDecoration(
-                            color: (_vibrantColor ?? _dominantColor ?? colorScheme.surfaceContainerHighest).withValues(
-                              alpha: 0.85,
-                            ),
-                            borderRadius: BorderRadius.circular(
-                              MiniPlayer._borderRadius,
-                            ),
-                            border: Border.all(
-                              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                              width: 1,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: colorScheme.shadow.withValues(alpha: 0.1),
-                                blurRadius: 16,
-                                spreadRadius: 1,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ),
-                  Positioned(
-                    top: 12,
-                    left: 24,
-                    child: Hero(
-                      tag: 'collapse_button',
-                      child: const SizedBox(width: 48, height: 48),
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment.center,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Row(
-                        children: [
-                          _ArtworkWidget(metadata: metadata),
-                          Expanded(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 300),
-                              switchInCurve: Curves.easeIn,
-                              switchOutCurve: Curves.easeOut,
-                              layoutBuilder: (currentChild, previousChildren) =>
-                                  Stack(
-                                    alignment: Alignment.centerLeft,
-                                    children: [
-                                      ...previousChildren,
-                                      if (currentChild != null) currentChild,
-                                    ],
-                                  ),
-                              transitionBuilder: (child, animation) =>
-                                  FadeTransition(
-                                    opacity: animation,
-                                    child: child,
-                                  ),
-                              child: KeyedSubtree(
-                                key: ValueKey(metadata.id),
-                                child: Hero(
-                                  tag: 'now_playing_title',
-                                  child: Material(
-                                    type: MaterialType.transparency,
-                                    child: _MetadataWidget(
-                                      title: metadata.title,
-                                      artist: metadata.artist,
-                                      colorScheme: colorScheme,
-                                    ),
-                                  ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: backgroundColor, // Use dynamic color
+                  borderRadius: BorderRadius.circular(MiniPlayer._borderRadius),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    children: [
+                      _ArtworkWidget(metadata: metadata),
+                      Expanded(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: KeyedSubtree(
+                            key: ValueKey(metadata.id),
+                            child: Hero(
+                              tag: 'now_playing_title',
+                              child: Material(
+                                type: MaterialType.transparency,
+                                child: _MetadataAndProgressWidget(
+                                  title: metadata.title,
+                                  artist: metadata.artist,
+                                  colorScheme: colorScheme,
+                                  position: state.position.position,
+                                  duration: totalDuration,
+                                  progress: progress,
                                 ),
                               ),
                             ),
                           ),
-                          _ControlsWidget(
-                            colorScheme: colorScheme,
-                            playbackState: state.playbackState,
-                            hasPrevious: widget.hasPrevious,
-                            hasNext: widget.hasNext,
-                            progress: progress,
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                      _ControlsWidget(
+                        colorScheme: colorScheme,
+                        playbackState: state.playbackState,
+                        hasPrevious: widget.hasPrevious,
+                        hasNext: widget.hasNext,
+                        progress: progress,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -391,16 +355,28 @@ class _ArtworkWidget extends StatelessWidget {
   }
 }
 
-class _MetadataWidget extends StatelessWidget {
-  const _MetadataWidget({
+class _MetadataAndProgressWidget extends StatelessWidget {
+  const _MetadataAndProgressWidget({
     required this.title,
     required this.artist,
     required this.colorScheme,
+    required this.position,
+    required this.duration,
+    required this.progress,
   });
 
   final String title;
   final String? artist;
   final ColorScheme colorScheme;
+  final Duration position;
+  final Duration duration;
+  final double progress;
+
+  String _formatDuration(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return "$minutes:$seconds";
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -433,13 +409,41 @@ class _MetadataWidget extends StatelessWidget {
               artist!,
               style: TextStyle(
                 color: colorScheme.onSurfaceVariant,
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w400,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ],
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Text(
+                _formatDuration(position),
+                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 10),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: SizedBox(
+                  height: 3,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(1.5),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: Colors.white24,
+                      valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _formatDuration(duration),
+                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 10),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -466,39 +470,24 @@ class _ControlsWidget extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (hasPrevious) ...[
-          IconButton(
-            onPressed: audioHandler.skipToPrevious,
-            splashColor: Colors.transparent,
-            highlightColor: Colors.transparent,
-            icon: Icon(
-              FluentIcons.previous_24_filled,
-              color: colorScheme.onSurface,
-              size: 20,
-            ),
-            visualDensity: VisualDensity.compact,
-          ),
-          const SizedBox(width: 4),
-        ],
         _CircularPlayButton(
           colorScheme: colorScheme,
           playbackState: playbackState,
-          progress: progress,
         ),
-        if (hasNext) ...[
-          const SizedBox(width: 4),
-          IconButton(
-            onPressed: audioHandler.skipToNext,
-            splashColor: Colors.transparent,
-            highlightColor: Colors.transparent,
-            icon: Icon(
-              FluentIcons.next_24_filled,
-              color: colorScheme.onSurface,
-              size: 20,
-            ),
-            visualDensity: VisualDensity.compact,
+        const SizedBox(width: 12),
+        Container(width: 1, height: 24, color: Colors.white24),
+        const SizedBox(width: 4),
+        IconButton(
+          onPressed: audioHandler.skipToNext,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          icon: Icon(
+            FluentIcons.next_24_filled,
+            color: colorScheme.secondary,
+            size: 24,
           ),
-        ],
+          visualDensity: VisualDensity.compact,
+        ),
       ],
     );
   }
@@ -508,12 +497,10 @@ class _CircularPlayButton extends StatelessWidget {
   const _CircularPlayButton({
     required this.colorScheme,
     required this.playbackState,
-    required this.progress,
   });
 
   final ColorScheme colorScheme;
   final PlaybackState playbackState;
-  final double progress;
 
   @override
   Widget build(BuildContext context) {
@@ -532,11 +519,8 @@ class _CircularPlayButton extends StatelessWidget {
         children: [
           CustomPaint(
             size: const Size(48, 48),
-            painter: _CircularProgressPainter(
-              progress: progress,
-              backgroundColor: colorScheme.surfaceContainerHighest,
-              progressColor: colorScheme.primary,
-              strokeWidth: 3,
+            painter: _DashedCirclePainter(
+              color: Colors.white30,
             ),
           ),
           if (isLoading)
@@ -545,16 +529,20 @@ class _CircularPlayButton extends StatelessWidget {
               height: 24,
               child: CircularProgressIndicator(
                 strokeWidth: 2.5,
-                valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+                valueColor: AlwaysStoppedAnimation<Color>(colorScheme.secondary),
               ),
             )
           else
             Container(
               width: 36,
               height: 36,
-              decoration: const BoxDecoration(
-                color: Color(0xFF8B5CF6),
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [colorScheme.primary, colorScheme.primary.withValues(alpha: 0.7)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
               child: IconButton(
                 onPressed: isCompleted
@@ -569,7 +557,7 @@ class _CircularPlayButton extends StatelessWidget {
                             ? FluentIcons.pause_16_filled
                             : FluentIcons.play_16_filled),
                   color: Colors.white,
-                  size: 20,
+                  size: 16,
                 ),
                 padding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
@@ -581,76 +569,39 @@ class _CircularPlayButton extends StatelessWidget {
   }
 }
 
-class _CircularProgressPainter extends CustomPainter {
-  _CircularProgressPainter({
-    required this.progress,
-    required this.backgroundColor,
-    required this.progressColor,
-    required this.strokeWidth,
-  });
-
-  final double progress;
-  final Color backgroundColor;
-  final Color progressColor;
-  final double strokeWidth;
-
-  final waveAmplitude = 1.5;
-  final waveFrequency = 12.0;
-  final animationValue = 0.0;
-
-  Path _buildWavyArcPath(Size size, double startAngle, double sweepAngle) {
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    final baseRadius = (size.width - strokeWidth) / 2;
-    final steps = (sweepAngle.abs() * 180 / math.pi).round().clamp(4, 720);
-    final path = Path();
-
-    for (var i = 0; i <= steps; i++) {
-      final t = i / steps;
-      final angle = startAngle + sweepAngle * t;
-      final wave =
-          waveAmplitude * math.sin(waveFrequency * angle + animationValue);
-      final r = baseRadius + wave;
-      final x = cx + r * math.cos(angle);
-      final y = cy + r * math.sin(angle);
-      i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
-    }
-    return path;
-  }
+class _DashedCirclePainter extends CustomPainter {
+  _DashedCirclePainter({required this.color});
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final trackPaint = Paint()
-      ..color = backgroundColor
+    final paint = Paint()
+      ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
+      ..strokeWidth = 2.0;
 
-    canvas.drawPath(
-      _buildWavyArcPath(size, -math.pi / 2, 2 * math.pi),
-      trackPaint,
-    );
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final radius = (size.width - 2) / 2;
+    final dashCount = 36;
+    final dashLength = 2.0;
+    final gapLength = (2 * math.pi * radius) / dashCount - dashLength;
 
-    if (progress > 0) {
-      final progressPaint = Paint()
-        ..color = progressColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round;
+    double currentAngle = 0;
+    for (int i = 0; i < dashCount; i++) {
+      final startX = cx + radius * math.cos(currentAngle);
+      final startY = cy + radius * math.sin(currentAngle);
+      
+      final endAngle = currentAngle + (dashLength / radius);
+      final endX = cx + radius * math.cos(endAngle);
+      final endY = cy + radius * math.sin(endAngle);
 
-      canvas.drawPath(
-        _buildWavyArcPath(size, -math.pi / 2, 2 * math.pi * progress),
-        progressPaint,
-      );
+      canvas.drawLine(Offset(startX, startY), Offset(endX, endY), paint);
+      
+      currentAngle = endAngle + (gapLength / radius);
     }
   }
 
   @override
-  bool shouldRepaint(_CircularProgressPainter old) =>
-      old.progress != progress ||
-      old.backgroundColor != backgroundColor ||
-      old.progressColor != progressColor ||
-      old.animationValue != animationValue;
+  bool shouldRepaint(_DashedCirclePainter old) => old.color != color;
 }

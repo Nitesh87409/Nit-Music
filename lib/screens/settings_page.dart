@@ -19,13 +19,11 @@ import 'package:musify/theme/app_colors.dart';
 import 'package:musify/theme/app_themes.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart';
 import 'package:musify/utilities/flutter_toast.dart';
-import 'package:musify/utilities/language_utils.dart';
-import 'package:musify/utilities/url_launcher.dart';
 import 'package:musify/widgets/bottom_sheet_bar.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
-import 'package:musify/widgets/custom_bar.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/section_header.dart';
+import 'package:musify/widgets/settings_components.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -64,181 +62,177 @@ class SettingsPage extends StatelessWidget {
     Color activatedColor,
     Color inactivatedColor,
   ) {
-    final isOffline = offlineMode.value;
-
     return Column(
       children: [
-        SectionHeader(
+        SettingsCardGroup(
           title: context.l10n!.preferences,
           icon: FluentIcons.options_24_filled,
-        ),
-        CustomBar(
-          context.l10n!.accentColor,
-          FluentIcons.color_24_regular,
-          borderRadius: commonCustomBarRadiusFirst,
-          onTap: () => _showAccentColorPicker(context),
-        ),
-        CustomBar(
-          context.l10n!.themeMode,
-          FluentIcons.weather_sunny_28_regular,
-          onTap: () => _showThemeModePicker(context),
-        ),
-
-        CustomBar(
-          context.l10n!.audioQuality,
-          FluentIcons.music_note_1_24_regular,
-          onTap: () => _showAudioQualityPicker(context),
-        ),
-        CustomBar(
-          context.l10n!.equalizer,
-          FluentIcons.data_histogram_24_regular,
-          onTap: () => context.push('/settings/equalizer'),
-        ),
-        CustomBar(
-          context.l10n!.dynamicColor,
-          FluentIcons.toggle_left_24_regular,
-          trailing: Switch(
-            value: useSystemColor.value,
-            onChanged: (value) => _toggleSystemColor(context, value),
-          ),
-        ),
-        if (themeMode == ThemeMode.dark)
-          CustomBar(
-            context.l10n!.pureBlackTheme,
-            FluentIcons.color_background_24_regular,
-            trailing: Switch(
-              value: usePureBlackColor.value,
-              onChanged: (value) => _togglePureBlack(context, value),
+          children: [
+            ModernSettingsTile(
+              title: context.l10n!.accentColor,
+              icon: FluentIcons.color_24_regular,
+              onTap: () => _showAccentColorPicker(context),
             ),
-          ),
-        ValueListenableBuilder<bool>(
-          valueListenable: predictiveBack,
-          builder: (_, value, __) {
-            return CustomBar(
-              context.l10n!.predictiveBack,
-              FluentIcons.position_backward_24_regular,
-              trailing: Switch(
-                value: value,
-                onChanged: (value) => _togglePredictiveBack(context, value),
+            ModernSettingsTile(
+              title: context.l10n!.themeMode,
+              icon: FluentIcons.weather_sunny_28_regular,
+              onTap: () => _showThemeModePicker(context),
+            ),
+
+            ModernSettingsTile(
+              title: context.l10n!.audioQuality,
+              icon: FluentIcons.music_note_1_24_regular,
+              onTap: () => _showAudioQualityPicker(context),
+            ),
+            ModernSettingsTile(
+              title: context.l10n!.equalizer,
+              icon: FluentIcons.data_histogram_24_regular,
+              onTap: () => context.push('/settings/equalizer'),
+            ),
+            ModernSettingsTile(
+              title: context.l10n!.dynamicColor,
+              icon: FluentIcons.toggle_left_24_regular,
+              trailing: ModernSwitch(
+                value: useSystemColor.value,
+                onChanged: (value) => _toggleSystemColor(context, value),
               ),
-            );
-          },
-        ),
-        ValueListenableBuilder<bool>(
-          valueListenable: useProxy,
-          builder: (_, value, __) {
-            return CustomBar(
-              context.l10n!.useProxy,
-              FluentIcons.shield_24_regular,
-              description: context.l10n!.useProxyDescription,
-              trailing: Switch(
-                value: value,
-                onChanged: (value) {
-                  useProxy.value = value;
-                  addOrUpdateData<bool>('settings', 'useProxy', value);
-                  showToast(context, context.l10n!.settingChangedMsg);
+            ),
+            if (themeMode == ThemeMode.dark)
+              ModernSettingsTile(
+                title: context.l10n!.pureBlackTheme,
+                icon: FluentIcons.color_background_24_regular,
+                trailing: ModernSwitch(
+                  value: usePureBlackColor.value,
+                  onChanged: (value) => _togglePureBlack(context, value),
+                ),
+              ),
+            ValueListenableBuilder<bool>(
+              valueListenable: predictiveBack,
+              builder: (_, value, __) {
+                return ModernSettingsTile(
+                  title: context.l10n!.predictiveBack,
+                  icon: FluentIcons.position_backward_24_regular,
+                  trailing: ModernSwitch(
+                    value: value,
+                    onChanged: (value) => _togglePredictiveBack(context, value),
+                  ),
+                );
+              },
+            ),
+            ValueListenableBuilder<bool>(
+              valueListenable: useProxy,
+              builder: (_, value, __) {
+                return ModernSettingsTile(
+                  title: context.l10n!.useProxy,
+                  icon: FluentIcons.shield_24_regular,
+                  subtitle: context.l10n!.useProxyDescription,
+                  trailing: ModernSwitch(
+                    value: value,
+                    onChanged: (value) {
+                      useProxy.value = value;
+                      addOrUpdateData<bool>('settings', 'useProxy', value);
+                      showToast(context, context.l10n!.settingChangedMsg);
+                    },
+                  ),
+                );
+              },
+            ),
+            ValueListenableBuilder<bool>(
+              valueListenable: wrappedEnabled,
+              builder: (_, value, __) {
+                return ModernSettingsTile(
+                  title: context.l10n!.listeningStats,
+                  icon: FluentIcons.clock_24_regular,
+                  subtitle: context.l10n!.listeningStatsDescription,
+                  trailing: ModernSwitch(
+                    value: value,
+                    onChanged: (value) => _toggleWrapped(context, value),
+                  ),
+                );
+              },
+            ),
+            ValueListenableBuilder<bool>(
+              valueListenable: offlineMode,
+              builder: (_, value, __) {
+                return ModernSettingsTile(
+                  title: context.l10n!.offlineMode,
+                  icon: FluentIcons.cloud_off_24_regular,
+                  subtitle: context.l10n!.offlineModeDescription,
+                  trailing: ModernSwitch(
+                    value: value,
+                    onChanged: (value) => _toggleOfflineMode(context, value),
+                  ),
+                );
+              },
+            ),
+            ValueListenableBuilder<bool>(
+              valueListenable: shakeToSkipEnabled,
+              builder: (_, enabled, __) {
+                return Column(
+                  children: [
+                    ModernSettingsTile(
+                      title: 'Shake to Skip',
+                      icon: FluentIcons.phone_shake_24_regular,
+                      subtitle: 'Shake phone to skip to next/previous song',
+                      trailing: ModernSwitch(
+                        value: enabled,
+                        onChanged: (value) =>
+                            _toggleShakeToSkip(context, value),
+                      ),
+                    ),
+                    if (enabled)
+                      ValueListenableBuilder<String>(
+                        valueListenable: shakeToSkipSensitivity,
+                        builder: (_, sensitivity, __) {
+                          String displaySens = 'Medium';
+                          if (sensitivity == 'low')
+                            displaySens = 'Low (Hard Shake)';
+                          if (sensitivity == 'high')
+                            displaySens = 'High (Light Shake)';
+                          return ModernSettingsTile(
+                            title: 'Shake Sensitivity',
+                            icon: FluentIcons.settings_24_regular,
+                            subtitle: 'Current: $displaySens',
+                            onTap: () => _showShakeSensitivityPicker(context),
+                          );
+                        },
+                      ),
+                  ],
+                );
+              },
+            ),
+            if (!isFdroidBuild)
+              ValueListenableBuilder<bool>(
+                valueListenable: shouldWeCheckUpdates,
+                builder: (_, value, __) {
+                  return Column(
+                    children: [
+                      ModernSettingsTile(
+                        title: context.l10n!.automaticUpdateChecks,
+                        icon: FluentIcons.arrow_sync_24_regular,
+                        subtitle:
+                            context.l10n!.automaticUpdateChecksDescription,
+                        trailing: ModernSwitch(
+                          value: value,
+                          onChanged: (value) =>
+                              _toggleAutomaticUpdateChecks(context, value),
+                        ),
+                      ),
+                      ModernSettingsTile(
+                        title: context.l10n!.checkForUpdates,
+                        icon: FluentIcons.arrow_sync_circle_24_regular,
+                        onTap: () {
+                          if (kReleaseMode && !offlineMode.value) {
+                            checkAppUpdates(manual: true);
+                          }
+                        },
+                      ),
+                    ],
+                  );
                 },
               ),
-            );
-          },
+          ],
         ),
-        ValueListenableBuilder<bool>(
-          valueListenable: wrappedEnabled,
-          builder: (_, value, __) {
-            return CustomBar(
-              context.l10n!.listeningStats,
-              FluentIcons.clock_24_regular,
-              description: context.l10n!.listeningStatsDescription,
-              trailing: Switch(
-                value: value,
-                onChanged: (value) => _toggleWrapped(context, value),
-              ),
-            );
-          },
-        ),
-        ValueListenableBuilder<bool>(
-          valueListenable: offlineMode,
-          builder: (_, value, __) {
-            return CustomBar(
-              context.l10n!.offlineMode,
-              FluentIcons.cloud_off_24_regular,
-              description: context.l10n!.offlineModeDescription,
-              borderRadius: isOffline && isFdroidBuild
-                  ? commonCustomBarRadiusLast
-                  : BorderRadius.zero,
-              trailing: Switch(
-                value: value,
-                onChanged: (value) => _toggleOfflineMode(context, value),
-              ),
-            );
-          },
-        ),
-        ValueListenableBuilder<bool>(
-          valueListenable: shakeToSkipEnabled,
-          builder: (_, enabled, __) {
-            return Column(
-              children: [
-                CustomBar(
-                  'Shake to Skip',
-                  FluentIcons.phone_shake_24_regular,
-                  description: 'Shake phone to skip to next/previous song',
-                  trailing: Switch(
-                    value: enabled,
-                    onChanged: (value) => _toggleShakeToSkip(context, value),
-                  ),
-                ),
-                if (enabled)
-                  ValueListenableBuilder<String>(
-                    valueListenable: shakeToSkipSensitivity,
-                    builder: (_, sensitivity, __) {
-                      String displaySens = 'Medium';
-                      if (sensitivity == 'low') displaySens = 'Low (Hard Shake)';
-                      if (sensitivity == 'high') displaySens = 'High (Light Shake)';
-                      return CustomBar(
-                        'Shake Sensitivity',
-                        FluentIcons.settings_24_regular,
-                        description: 'Current: $displaySens',
-                        onTap: () => _showShakeSensitivityPicker(context),
-                      );
-                    },
-                  ),
-              ],
-            );
-          },
-        ),
-        if (!isFdroidBuild)
-          ValueListenableBuilder<bool>(
-            valueListenable: shouldWeCheckUpdates,
-            builder: (_, value, __) {
-              return Column(
-                children: [
-                  CustomBar(
-                    context.l10n!.automaticUpdateChecks,
-                    FluentIcons.arrow_sync_24_regular,
-                    description: context.l10n!.automaticUpdateChecksDescription,
-                    borderRadius: BorderRadius.zero,
-                    trailing: Switch(
-                      value: value,
-                      onChanged: (value) =>
-                          _toggleAutomaticUpdateChecks(context, value),
-                    ),
-                  ),
-                  CustomBar(
-                    context.l10n!.checkForUpdates,
-                    FluentIcons.arrow_sync_circle_24_regular,
-                    borderRadius: offlineMode.value
-                        ? commonCustomBarRadiusLast
-                        : BorderRadius.zero,
-                    onTap: () {
-                      if (kReleaseMode && !offlineMode.value) {
-                        checkAppUpdates(manual: true);
-                      }
-                    },
-                  ),
-                ],
-              );
-            },
-          ),
       ],
     );
   }
@@ -249,11 +243,11 @@ class SettingsPage extends StatelessWidget {
         ValueListenableBuilder<bool>(
           valueListenable: playNextSongAutomatically,
           builder: (_, value, __) {
-            return CustomBar(
-              context.l10n!.automaticSongPicker,
-              FluentIcons.music_note_2_play_20_regular,
-              description: context.l10n!.automaticSongPickerDescription,
-              trailing: Switch(
+            return ModernSettingsTile(
+              title: context.l10n!.automaticSongPicker,
+              icon: FluentIcons.music_note_2_play_20_regular,
+              subtitle: context.l10n!.automaticSongPickerDescription,
+              trailing: ModernSwitch(
                 value: value,
                 onChanged: (value) {
                   _toggleAutoPlayNext(context, value);
@@ -266,12 +260,11 @@ class SettingsPage extends StatelessWidget {
         ValueListenableBuilder<bool>(
           valueListenable: externalRecommendations,
           builder: (_, value, __) {
-            return CustomBar(
-              context.l10n!.externalRecommendations,
-              FluentIcons.channel_share_24_regular,
-              description: context.l10n!.externalRecommendationsDescription,
-              borderRadius: commonCustomBarRadiusLast,
-              trailing: Switch(
+            return ModernSettingsTile(
+              title: context.l10n!.externalRecommendations,
+              icon: FluentIcons.channel_share_24_regular,
+              subtitle: context.l10n!.externalRecommendationsDescription,
+              trailing: ModernSwitch(
                 value: value,
                 onChanged: (value) =>
                     _toggleExternalRecommendations(context, value),
@@ -281,7 +274,6 @@ class SettingsPage extends StatelessWidget {
         ),
 
         _buildToolsSection(context),
-
       ],
     );
   }
@@ -293,10 +285,9 @@ class SettingsPage extends StatelessWidget {
           title: context.l10n!.tools,
           icon: FluentIcons.toolbox_24_filled,
         ),
-        CustomBar(
-          context.l10n!.clearCache,
-          FluentIcons.broom_24_regular,
-          borderRadius: commonCustomBarRadiusFirst,
+        ModernSettingsTile(
+          title: context.l10n!.clearCache,
+          icon: FluentIcons.broom_24_regular,
           onTap: () async {
             final cleared = await clearCache();
             showToast(
@@ -305,9 +296,9 @@ class SettingsPage extends StatelessWidget {
             );
           },
         ),
-        CustomBar(
-          context.l10n!.clearSearchHistory,
-          FluentIcons.history_24_regular,
+        ModernSettingsTile(
+          title: context.l10n!.clearSearchHistory,
+          icon: FluentIcons.history_24_regular,
           onTap: () => _showConfirmationDialog(
             context: context,
             confirmationMessage: context.l10n!.clearSearchHistoryQuestion,
@@ -318,9 +309,9 @@ class SettingsPage extends StatelessWidget {
             },
           ),
         ),
-        CustomBar(
-          context.l10n!.clearRecentlyPlayed,
-          FluentIcons.receipt_play_24_regular,
+        ModernSettingsTile(
+          title: context.l10n!.clearRecentlyPlayed,
+          icon: FluentIcons.receipt_play_24_regular,
           onTap: () => _showConfirmationDialog(
             context: context,
             confirmationMessage: context.l10n!.clearRecentlyPlayedQuestion,
@@ -331,9 +322,9 @@ class SettingsPage extends StatelessWidget {
             },
           ),
         ),
-        CustomBar(
-          context.l10n!.clearListeningStats,
-          FluentIcons.clock_24_regular,
+        ModernSettingsTile(
+          title: context.l10n!.clearListeningStats,
+          icon: FluentIcons.clock_24_regular,
           onTap: () => _showConfirmationDialog(
             context: context,
             confirmationMessage: context.l10n!.clearListeningStatsQuestion,
@@ -349,9 +340,9 @@ class SettingsPage extends StatelessWidget {
             },
           ),
         ),
-        CustomBar(
-          context.l10n!.deleteDownloads,
-          FluentIcons.delete_24_regular,
+        ModernSettingsTile(
+          title: context.l10n!.deleteDownloads,
+          icon: FluentIcons.delete_24_regular,
           onTap: () => _showConfirmationDialog(
             context: context,
             confirmationMessage: context.l10n!.deleteDownloadsQuestion,
@@ -371,14 +362,14 @@ class SettingsPage extends StatelessWidget {
             },
           ),
         ),
-        CustomBar(
-          context.l10n!.backupUserData,
-          FluentIcons.cloud_sync_24_regular,
+        ModernSettingsTile(
+          title: context.l10n!.backupUserData,
+          icon: FluentIcons.cloud_sync_24_regular,
           onTap: () => _backupUserData(context),
         ),
-        CustomBar(
-          context.l10n!.restoreUserData,
-          FluentIcons.cloud_add_24_regular,
+        ModernSettingsTile(
+          title: context.l10n!.restoreUserData,
+          icon: FluentIcons.cloud_add_24_regular,
           onTap: () async {
             try {
               final result = await restoreData(context);
@@ -432,16 +423,14 @@ class SettingsPage extends StatelessWidget {
           title: context.l10n!.others,
           icon: FluentIcons.more_circle_24_filled,
         ),
-        CustomBar(
-          '${context.l10n!.copyLogs} (${logger.getLogCount()})',
-          FluentIcons.error_circle_24_regular,
-          borderRadius: commonCustomBarRadiusFirst,
+        ModernSettingsTile(
+          title: '${context.l10n!.copyLogs} (${logger.getLogCount()})',
+          icon: FluentIcons.error_circle_24_regular,
           onTap: () async => showToast(context, await logger.copyLogs(context)),
         ),
-        CustomBar(
-          context.l10n!.about,
-          FluentIcons.book_information_24_regular,
-          borderRadius: commonCustomBarRadiusLast,
+        ModernSettingsTile(
+          title: context.l10n!.about,
+          icon: FluentIcons.book_information_24_regular,
           onTap: () => NavigationManager.router.go('/settings/about'),
         ),
       ],
@@ -547,47 +536,6 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  void _showLanguagePicker(BuildContext context) {
-    final availableLanguages = appLanguages.toList();
-    final activeLanguageCode = Localizations.localeOf(context).languageCode;
-    final activeScriptCode = Localizations.localeOf(context).scriptCode;
-    final activeLanguageFullCode = activeScriptCode != null
-        ? '$activeLanguageCode-$activeScriptCode'
-        : activeLanguageCode;
-
-    showCustomBottomSheet(
-      context,
-      ListView.builder(
-        shrinkWrap: true,
-        physics: const BouncingScrollPhysics(),
-        padding: commonListViewBottomPadding,
-        itemCount: availableLanguages.length,
-        itemBuilder: (context, index) {
-          final language = availableLanguages[index];
-          final newLocale = getLocaleFromLanguageCode(language);
-          final newLocaleFullCode = newLocale.scriptCode != null
-              ? '${newLocale.languageCode}-${newLocale.scriptCode}'
-              : newLocale.languageCode;
-
-          return BottomSheetBar(
-            getLanguageDisplayName(context, language),
-            () {
-              addOrUpdateData<String>(
-                'settings',
-                'languageCode',
-                newLocaleFullCode,
-              );
-              Musify.updateAppState(context, newLocale: newLocale);
-              showToast(context, context.l10n!.languageMsg);
-              Navigator.pop(context);
-            },
-            activeLanguageFullCode == newLocaleFullCode,
-          );
-        },
-      ),
-    );
-  }
-
   void _showAudioQualityPicker(BuildContext context) {
     final availableQualities = ['low', 'medium', 'high'];
     final qualityNames = [
@@ -685,12 +633,6 @@ class SettingsPage extends StatelessWidget {
     showToast(context, context.l10n!.settingChangedMsg);
   }
 
-  void _toggleSponsorBlock(BuildContext context, bool value) {
-    addOrUpdateData<bool>('settings', 'sponsorBlockSupport', value);
-    sponsorBlockSupport.value = value;
-    showToast(context, context.l10n!.settingChangedMsg);
-  }
-
   void _toggleAutoPlayNext(BuildContext context, bool value) {
     addOrUpdateData<bool>('settings', 'playNextSongAutomatically', value);
     playNextSongAutomatically.value = value;
@@ -714,7 +656,11 @@ class SettingsPage extends StatelessWidget {
             value: 'low',
             groupValue: shakeToSkipSensitivity.value,
             onChanged: (value) {
-              addOrUpdateData<String>('settings', 'shakeToSkipSensitivity', value!);
+              addOrUpdateData<String>(
+                'settings',
+                'shakeToSkipSensitivity',
+                value!,
+              );
               shakeToSkipSensitivity.value = value;
               Navigator.pop(context);
             },
@@ -724,7 +670,11 @@ class SettingsPage extends StatelessWidget {
             value: 'medium',
             groupValue: shakeToSkipSensitivity.value,
             onChanged: (value) {
-              addOrUpdateData<String>('settings', 'shakeToSkipSensitivity', value!);
+              addOrUpdateData<String>(
+                'settings',
+                'shakeToSkipSensitivity',
+                value!,
+              );
               shakeToSkipSensitivity.value = value;
               Navigator.pop(context);
             },
@@ -734,7 +684,11 @@ class SettingsPage extends StatelessWidget {
             value: 'high',
             groupValue: shakeToSkipSensitivity.value,
             onChanged: (value) {
-              addOrUpdateData<String>('settings', 'shakeToSkipSensitivity', value!);
+              addOrUpdateData<String>(
+                'settings',
+                'shakeToSkipSensitivity',
+                value!,
+              );
               shakeToSkipSensitivity.value = value;
               Navigator.pop(context);
             },
