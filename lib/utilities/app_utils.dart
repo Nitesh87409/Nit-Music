@@ -1,6 +1,30 @@
-import 'package:flutter/material.dart';
+/*
+ *     Copyright (C) 2026 Valeri Gokadze
+ *
+ *     Musify is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     Musify is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *     You should have received a copy of the GNU General Public License
+ *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ *
+ *     For more information about Musify, including how to contribute,
+ *     please visit: https://github.com/gokadzev/Musify
+ */
+
 import 'package:intl/intl.dart';
+import 'package:flutter/material.dart';
 import 'package:musify/constants/app_constants.dart';
+import 'package:musify/services/settings_manager.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+
 BorderRadius getItemBorderRadius(
   int index,
   int totalLength, {
@@ -23,6 +47,13 @@ BorderRadius getItemBorderRadius(
 
 ValueKey<int> listItemKey(String scope, int index, [Object? item]) {
   return ValueKey<int>(Object.hash(scope, index, item));
+}
+
+/// Reads a stored/decoded `List` of maps back into typed maps, dropping any
+/// entry that is not a map. Returns an empty list for anything else.
+List<Map<String, dynamic>> asMapList(dynamic value) {
+  if (value is! List) return const [];
+  return value.whereType<Map>().map(Map<String, dynamic>.from).toList();
 }
 
 /// Validates if a URL is a YouTube playlist URL
@@ -79,12 +110,67 @@ String formatMonthPeriodLabel(Locale locale, String monthKey) {
   final month = int.tryParse(parts[1]);
   if (year == null || month == null) return monthKey;
 
-  final label = DateFormat.yMMMM(locale.toString()).format(
-    DateTime(year, month),
-  );
+  final label = DateFormat.yMMMM(locale.toString())
+      .format(DateTime(year, month));
   return label.isEmpty
       ? monthKey
       : '${label[0].toUpperCase()}${label.substring(1)}';
 }
 
+AudioOnlyStreamInfo? selectAudioOnlyStreamForQuality(
+  List<AudioOnlyStreamInfo> availableSources,
+) {
+  if (availableSources.isEmpty) return null;
 
+  final compatibleSources = _filterCompatibleAudioOnlySources(availableSources);
+  final selectionPool =
+      (compatibleSources.isNotEmpty
+            ? compatibleSources
+            : List<AudioOnlyStreamInfo>.from(availableSources))
+        ..sort((a, b) => b.bitrate.compareTo(a.bitrate));
+
+  final qualitySetting = audioQualitySetting.value;
+
+  if (qualitySetting == 'low') {
+    return selectionPool.last;
+  } else if (qualitySetting == 'medium') {
+    return selectionPool[(selectionPool.length - 1) ~/ 2];
+  }
+
+  return selectionPool.first;
+}
+
+List<AudioOnlyStreamInfo> _filterCompatibleAudioOnlySources(
+  List<AudioOnlyStreamInfo> sources,
+) {
+  return sources
+      .where((stream) => _audioOnlyCompatibilityScore(stream) >= 2)
+      .toList();
+}
+
+int _audioOnlyCompatibilityScore(AudioOnlyStreamInfo stream) {
+  final codec = stream.codec.toString().toLowerCase();
+  final container = stream.container.name.toLowerCase();
+
+  if (_isDolbyCodec(codec)) {
+    return 0;
+  }
+
+  if ((codec.contains('mp4a') || codec.contains('aac')) &&
+      (container == 'mp4' || container == 'm4a')) {
+    return 3;
+  }
+
+  if (codec.contains('opus') || codec.contains('vorbis')) {
+    return 2;
+  }
+
+  return 1;
+}
+
+bool _isDolbyCodec(String codec) {
+  return codec.contains('ec-3') ||
+      codec.contains('ac-3') ||
+      codec.contains('eac3') ||
+      codec.contains('dolby');
+}

@@ -315,11 +315,7 @@ class _NowPlayingOptionsMenuState extends State<NowPlayingOptionsMenu> {
         padding: const EdgeInsets.all(12),
       ),
       onSelected: (value) {
-        if (value == 0) {
-          if (widget.audioId != null) {
-            _toggleOffline();
-          }
-        } else if (value == 1) {
+        if (value == 1) {
           final isActive = sleepTimerNotifier.value != null;
           if (isActive) {
             audioHandler.cancelSleepTimer();
@@ -332,42 +328,9 @@ class _NowPlayingOptionsMenuState extends State<NowPlayingOptionsMenu> {
           } else {
             _showSleepTimerDialog(context);
           }
-        } else if (value == 2) {
-          showAddToPlaylistDialog(
-            context,
-            song: mediaItemToMap(widget.metadata),
-          );
         }
       },
       itemBuilder: (context) => [
-        PopupMenuItem(
-          value: 0,
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: ValueListenableBuilder<bool>(
-            valueListenable: _songOfflineStatus,
-            builder: (_, isOffline, __) {
-              return Row(
-                children: [
-                  Icon(
-                    isOffline
-                        ? FluentIcons.cloud_off_24_filled
-                        : FluentIcons.cloud_arrow_down_24_regular,
-                    size: 20,
-                    color: isOffline
-                        ? Theme.of(context).colorScheme.primary
-                        : colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    l10n.makeOffline,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
         PopupMenuItem(
           value: 1,
           height: 38,
@@ -397,26 +360,6 @@ class _NowPlayingOptionsMenuState extends State<NowPlayingOptionsMenu> {
             },
           ),
         ),
-        if (!offlineMode.value)
-          PopupMenuItem(
-            value: 2,
-            height: 38,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Icon(
-                  FluentIcons.album_add_24_regular,
-                  size: 20,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  l10n.addToPlaylist,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-          ),
       ],
     );
   }

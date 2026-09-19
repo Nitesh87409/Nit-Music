@@ -15,6 +15,7 @@ import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/widgets/now_playing/marquee_text_widget.dart';
 import 'package:musify/widgets/playback_icon_button.dart';
 import 'package:musify/widgets/position_slider.dart';
+import 'package:musify/utilities/playlist_dialogs.dart';
 
 class NowPlayingControls extends StatelessWidget {
   const NowPlayingControls({
@@ -64,6 +65,13 @@ class NowPlayingControls extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (!isCompact) const Spacer(),
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 16 : 24,
+                vertical: spacing,
+              ),
+              child: PlayerActionButtons(audioId: audioId, metadata: metadata),
+            ),
             Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: isDesktop ? 16 : 24,
@@ -635,6 +643,117 @@ class _LikeButtonState extends State<_LikeButton> with SingleTickerProviderState
           },
         );
       },
+    );
+  }
+}
+
+class PlayerActionButtons extends StatefulWidget {
+  const PlayerActionButtons({
+    super.key,
+    required this.audioId,
+    required this.metadata,
+  });
+
+  final dynamic audioId;
+  final MediaItem metadata;
+
+  @override
+  State<PlayerActionButtons> createState() => _PlayerActionButtonsState();
+}
+
+class _PlayerActionButtonsState extends State<PlayerActionButtons> {
+  late final ValueNotifier<bool> _songOfflineStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _songOfflineStatus = ValueNotifier<bool>(isSongAlreadyOffline(widget.audioId));
+    userOfflineSongs.addListener(_syncOfflineStatus);
+  }
+
+  void _syncOfflineStatus() {
+    final newStatus = isSongAlreadyOffline(widget.audioId);
+    if (_songOfflineStatus.value != newStatus) {
+      _songOfflineStatus.value = newStatus;
+    }
+  }
+
+  @override
+  void didUpdateWidget(PlayerActionButtons oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.audioId != widget.audioId) {
+      _songOfflineStatus.value = isSongAlreadyOffline(widget.audioId);
+    }
+  }
+
+  @override
+  void dispose() {
+    userOfflineSongs.removeListener(_syncOfflineStatus);
+    _songOfflineStatus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggleOffline() async {
+    final originalValue = _songOfflineStatus.value;
+    _songOfflineStatus.value = !originalValue;
+
+    try {
+      final bool success;
+      if (originalValue) {
+        success = await removeSongFromOffline(widget.audioId);
+      } else {
+        success = await makeSongOffline(mediaItemToMap(widget.metadata));
+      }
+      if (!success) {
+        _songOfflineStatus.value = originalValue;
+      }
+    } catch (e) {
+      _songOfflineStatus.value = originalValue;
+      logger.log('Error toggling offline status', error: e);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        if (!offlineMode.value)
+          IconButton(
+            icon: Icon(FluentIcons.album_add_24_regular, color: colorScheme.onSurfaceVariant),
+            iconSize: 24,
+            style: IconButton.styleFrom(
+              padding: const EdgeInsets.all(8),
+              minimumSize: const Size(40, 40),
+            ),
+            onPressed: () {
+              showAddToPlaylistDialog(context, song: mediaItemToMap(widget.metadata));
+            },
+          ),
+        const SizedBox(width: 8),
+        ValueListenableBuilder<bool>(
+          valueListenable: _songOfflineStatus,
+          builder: (_, isOffline, __) {
+            return IconButton(
+              icon: Icon(
+                isOffline ? FluentIcons.cloud_off_24_filled : FluentIcons.cloud_arrow_down_24_regular,
+                color: isOffline ? colorScheme.primary : colorScheme.onSurfaceVariant,
+              ),
+              iconSize: 24,
+              style: IconButton.styleFrom(
+                padding: const EdgeInsets.all(8),
+                minimumSize: const Size(40, 40),
+              ),
+              onPressed: () {
+                if (widget.audioId != null) {
+                  _toggleOffline();
+                }
+              },
+            );
+          },
+        ),
+      ],
     );
   }
 }

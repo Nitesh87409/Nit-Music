@@ -23,10 +23,7 @@ class YoutubeExplode {
 
   late final BaseJSChallengeSolver? _jsSolver;
 
-  /// YouTube HTTP client.
-  YoutubeHttpClient get httpClient => _httpClient;
-
-  /// Initializes an instance of [YoutubeExplode].
+  /// Initializes an instance of [YoutubeClient].
   YoutubeExplode({
     YoutubeHttpClient? httpClient,
     BaseJSChallengeSolver? jsSolver,

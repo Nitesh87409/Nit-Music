@@ -3,6 +3,8 @@ analyzer:
     - packages/**
     - scripts/**
     - test/**
+    - build/**
+    - android/**
 
 linter:
   rules:

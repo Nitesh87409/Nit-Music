@@ -1,27 +1,56 @@
+/*
+ *     Copyright (C) 2026 Valeri Gokadze
+ *
+ *     Musify is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     Musify is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *     You should have received a copy of the GNU General Public License
+ *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ *
+ *     For more information about Musify, including how to contribute,
+ *     please visit: https://github.com/gokadzev/Musify
+ */
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/widgets.dart';
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
+import 'package:musify/constants/clients.dart';
 import 'package:musify/main.dart' show logger;
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/io_service.dart';
-import 'package:musify/services/jiosaavn_api.dart';
 import 'package:musify/services/lyrics_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
-import 'package:musify/screens/search_page.dart';
+import 'package:musify/services/proxy_manager.dart';
 import 'package:musify/services/settings_manager.dart';
-import 'package:musify/services/smart_search_algorithm.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/formatter.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 List globalSongs = [];
 
 ValueNotifier<List> userLikedSongsList = ValueNotifier<List>(
   Hive.box('user').get('likedSongs', defaultValue: []),
 );
+
+ValueNotifier<List<String>> userLikedRadioStations =
+    ValueNotifier<List<String>>(
+      List<String>.from(
+        Hive.box('user').get('likedRadioStations', defaultValue: []),
+      ),
+    );
 
 ValueNotifier<List> userRecentlyPlayed = ValueNotifier<List>(
   Hive.box('user').get('recentlyPlayedSongs', defaultValue: []),
@@ -30,7 +59,29 @@ ValueNotifier<List> userOfflineSongs = ValueNotifier<List>(
   Hive.box('userNoBackup').get('offlineSongs', defaultValue: []),
 );
 
+Set<String> _createSongIdCache(ValueNotifier<List> source) {
+  final cache = _songIds(source.value);
 
+  source.addListener(() {
+    cache
+      ..clear()
+      ..addAll(_songIds(source.value));
+  });
+
+  return cache;
+}
+
+Set<String> _songIds(Iterable songs) => songs
+    .whereType<Map>()
+    .map((song) => song['ytid']?.toString())
+    .whereType<String>()
+    .where((ytid) => ytid.isNotEmpty)
+    .toSet();
+
+final _cachedLikedSongIds = _createSongIdCache(userLikedSongsList);
+final _cachedOfflineSongIds = _createSongIdCache(userOfflineSongs);
+
+dynamic nextRecommendedSong;
 
 var _songLikeUpdateToken = 0;
 final _latestSongLikeUpdateTokens = <String, int>{};
@@ -48,181 +99,210 @@ void reloadSongLibraryStateFromStorage() {
   );
 }
 
-// JioSaavn API instance for all music operations.
-final _saavn = JioSaavnApi.instance;
+// Timeouts and durations used across manifest fetching and cache validation.
+const Duration _manifestTimeout = Duration(seconds: 30);
+const Duration _cacheValidationDuration = Duration(hours: 1);
 
+/// Fetches a stream manifest for a song, honoring proxy settings.
+Future<StreamManifest?> _fetchStreamManifest(String songId) async {
+  if (useProxy.value) {
+    return ProxyManager().getSongManifest(songId).timeout(_manifestTimeout);
+  }
 
+  return ytClient.videos.streams
+      .getManifest(songId, ytClients: customClients)
+      .timeout(_manifestTimeout);
+}
 
+/// Returns a cached song URL if present and still valid.
+Future<String?> _getCachedSongUrl(
+  String cacheKey,
+  Duration cacheDuration,
+) async {
+  final cachedUrl = await getData(
+    'cache',
+    cacheKey,
+    cachingDuration: cacheDuration,
+  );
 
+  if (cachedUrl is! String || cachedUrl.isEmpty) {
+    return null;
+  }
 
-Future<List> getTrendingSongs() async {
+  final cacheBox = await Hive.openBox('cache');
+  final cacheDate = cacheBox.get('${cacheKey}_date') as DateTime?;
+  final now = DateTime.now();
+  final isOld =
+      cacheDate != null && now.difference(cacheDate) > _cacheValidationDuration;
+
+  if (!isOld) {
+    return cachedUrl;
+  }
+
+  if (await _validateCachedUrl(cachedUrl)) {
+    return cachedUrl;
+  }
+
+  await deleteData('cache', cacheKey);
+  await deleteData('cache', '${cacheKey}_date');
+  return null;
+}
+
+/// Checks if a cached URL still responds successfully.
+Future<bool> _validateCachedUrl(String cachedUrl) async {
   try {
-    final results = await _saavn.getTrendingSongs();
-    return results.map((song) => _saavn.formatSong(song)).toList();
-  } catch (e, stackTrace) {
-    logger.log('Error in getTrendingSongs', error: e, stackTrace: stackTrace);
-    return [];
+    final response = await http.head(Uri.parse(cachedUrl));
+    return response.statusCode >= 200 && response.statusCode < 300;
+  } catch (_) {
+    return false;
   }
 }
 
 Future<List> fetchSongsList(String searchQuery) async {
   try {
-    final results = await _saavn.searchSongs(searchQuery);
-    return results.map((song) => _saavn.formatSong(song)).toList();
+    // If not in cache, perform the search
+    final List<Video> searchResults = await ytClient.search.search(searchQuery);
+    final songsList = searchResults
+        .map((video) => returnSongLayout(0, video))
+        .toList();
+
+    return songsList;
   } catch (e, stackTrace) {
     logger.log('Error in fetchSongsList', error: e, stackTrace: stackTrace);
     return [];
   }
 }
 
-/// Tracks the current page number for paginated search.
-int _currentSearchPage = 1;
-String _lastSearchQuery = '';
-
-Future<Map<String, dynamic>> fetchSongsListWithPagination(String searchQuery) async {
-  try {
-    _currentSearchPage = 1;
-    _lastSearchQuery = searchQuery;
-    
-    final smartSearch = SmartSearchAlgorithm();
-    
-    // Always clean the query BEFORE calling API
-    String apiQuery = smartSearch.getCleanedQuery(searchQuery);
-    
-    final regularResults = await _saavn.searchSongs(apiQuery, page: 1);
-    
-    // Always apply Smart Search scoring & sorting
-    List<Map<String, dynamic>> finalResults = await smartSearch.processSearch(apiQuery, regularResults);
-    
-    final formattedSongs = finalResults.map((song) => _saavn.formatSong(song)).toList();
-
-    return {
-      'songs': formattedSongs,
-      'nextPage': formattedSongs.length >= 20 ? (_currentSearchPage + 1) : null,
-    };
-  } catch (e, stackTrace) {
-    logger.log('Error in fetchSongsListWithPagination', error: e, stackTrace: stackTrace);
-    return {'songs': [], 'nextPage': null};
-  }
-}
-
-Future<Map<String, dynamic>> fetchNextSongsList(dynamic currentList) async {
-  if (currentList == null) {
-    return {'songs': [], 'nextPage': null};
-  }
-
-  try {
-    _currentSearchPage = (currentList is int) ? currentList : _currentSearchPage + 1;
-    final results = await _saavn.searchSongs(_lastSearchQuery, page: _currentSearchPage);
-    if (results.isEmpty) return {'songs': [], 'nextPage': null};
-
-    final songsList = results.map((song) => _saavn.formatSong(song)).toList();
-
-    return {
-      'songs': songsList,
-      'nextPage': results.length >= 20 ? (_currentSearchPage + 1) : null,
-    };
-  } catch (e, stackTrace) {
-    logger.log('Error in fetchNextSongsList', error: e, stackTrace: stackTrace);
-    return {'songs': [], 'nextPage': null};
-  }
-}
-
 Future<List> getRecommendedSongs() async {
-    try {
-      final List searchHistoryList = searchHistoryNotifier.value;
-      if (searchHistoryList.isNotEmpty) {
-        return await _getRecommendationsFromSearchHistory();
-      } else if (userRecentlyPlayed.value.isNotEmpty) {
-        return await _getRecommendationsFromRecentlyPlayed();
-      } else {
-        return await _getRecommendationsFromMixedSources();
-      }
-    } catch (e, stackTrace) {
+  try {
+    if (externalRecommendations.value && userRecentlyPlayed.value.isNotEmpty) {
+      return await _getRecommendationsFromRecentlyPlayed();
+    } else {
+      return await _getRecommendationsFromMixedSources();
+    }
+  } catch (e, stackTrace) {
     logger.log(
       'Error in getRecommendedSongs',
       error: e,
       stackTrace: stackTrace,
     );
     return [];
-    }
   }
+}
 
-  Future<List> _getRecommendationsFromSearchHistory() async {
-    try {
-      final List searchHistoryList = searchHistoryNotifier.value;
-      
-      // Get the 2 most recent unique searches
-      final recentSearches = searchHistoryList.take(2).toList();
-      
-      final futures = recentSearches.map((query) async {
-        try {
-          final q = query.toString().trim();
-          if (q.isEmpty) return <Map>[];
-          
-          final smartSearch = SmartSearchAlgorithm();
-          final apiQuery = smartSearch.getCleanedQuery(q);
-          
-          final regularResults = await _saavn.searchSongs(apiQuery, page: 1);
-          final finalResults = await smartSearch.processSearch(apiQuery, regularResults);
-          
-          return finalResults.take(10).map((s) => _saavn.formatSong(s)).toList();
-        } catch (e) {
-          return <Map>[];
-        }
-      }).toList();
-      
-      final results = await Future.wait(futures);
-      final searchSongs = results.expand((list) => list).toList();
-      
-      // Blend with recently played to keep the mix healthy
-      List recentlyPlayedSongs = [];
-      if (userRecentlyPlayed.value.isNotEmpty) {
-        recentlyPlayedSongs = (List.from(userRecentlyPlayed.value)..shuffle()).take(5).toList();
-      }
-      
-      final allSongs = [...searchSongs, ...recentlyPlayedSongs];
-      return _deduplicateAndShuffle(allSongs);
-      
-    } catch (e, stackTrace) {
-      logger.log(
-        'Error getting recommendations from search history',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      if (userRecentlyPlayed.value.isNotEmpty) {
-        return await _getRecommendationsFromRecentlyPlayed();
-      } else {
-        return await _getRecommendationsFromMixedSources();
-      }
-    }
-  }
-  
-  Future<List> _getRecommendationsFromRecentlyPlayed() async {
+Future<List> _getRecommendationsFromRecentlyPlayed() async {
   final recent = (List.from(
     userRecentlyPlayed.value,
-  )..shuffle()).take(3).toList();
+  )..shuffle()).take(5).toList();
 
-  final futures = recent.map((songData) async {
+  return _getRecommendationsFromSeedSongs(recent);
+}
+
+/// Expands seed songs into related videos and ranks them for home and playlist recommendations.
+Future<List> _getRecommendationsFromSeedSongs(List seedSongs) async {
+  final seeds = seedSongs
+      .whereType<Map>()
+      .where((song) => (song['ytid']?.toString() ?? '').isNotEmpty)
+      .toList();
+  if (seeds.isEmpty) return [];
+
+  final scores = <String, double>{};
+  final songMap = <String, Map>{};
+
+  final futures = seeds.asMap().entries.map((entry) async {
+    final seedIndex = entry.key;
+    final songData = entry.value;
     try {
-      final songId = songData['ytid']?.toString() ?? '';
-      if (songId.isEmpty) return <Map>[];
-      final related = await _saavn.getRelatedSongs(songId);
-      return related.take(5).map((s) => _saavn.formatSong(s)).toList();
-    } catch (e, stackTrace) {
+      final song = await ytClient.videos.get(songData['ytid']);
+      final related = await ytClient.videos.getRelatedVideos(song) ?? [];
+      for (var i = 0; i < related.length && i < 8; i++) {
+        final s = returnSongLayout(0, related[i]);
+        final id = s['ytid'];
+        final positionWeight = 1.0 - (i / 8);
+        final recencyWeight = 1.0 - (seedIndex / seeds.length);
+        scores[id] = (scores[id] ?? 0) + positionWeight * recencyWeight;
+        songMap[id] = s;
+      }
+    } catch (e, st) {
       logger.log(
-        'Error getting related songs for ${songData['ytid']}',
+        'related videos error for ${songData['ytid']}',
         error: e,
-        stackTrace: stackTrace,
+        stackTrace: st,
       );
-      return <Map>[];
     }
   }).toList();
 
-  final results = await Future.wait(futures);
-  final playlistSongs = results.expand((list) => list).take(15).toList()
-    ..shuffle();
-  return playlistSongs;
+  await Future.wait(futures);
+
+  final sorted = scores.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+  return sorted.take(15).map((e) => songMap[e.key]!).toList();
+}
+
+/// Number of playlist tracks used to seed recommendations while keeping network cost bounded.
+const _playlistRecommendationSeedCount = 5;
+
+/// In-memory recommendations cache keyed by playlist ytid and cleared on app restart.
+final Map<String, List> _playlistRecommendationsCache = {};
+
+/// Gets playlist-seeded recommendations, reusing cached results and returning an empty list on failure.
+Future<List> getRecommendedSongsForPlaylist(
+  String playlistId,
+  List playlistSongs,
+) async {
+  try {
+    final existingIds = playlistSongs
+        .whereType<Map>()
+        .map((song) => song['ytid']?.toString())
+        .toSet();
+
+    final cached = _playlistRecommendationsCache[playlistId];
+    if (cached != null) {
+      final stillFresh = cached
+          .where((song) => !existingIds.contains(song['ytid']?.toString()))
+          .toList();
+      if (stillFresh.isNotEmpty) return stillFresh;
+    }
+
+    final seeds = _sampleSeedSongs(
+      playlistSongs,
+      _playlistRecommendationSeedCount,
+    );
+    final recommendations = await _getRecommendationsFromSeedSongs(seeds);
+    final filtered = recommendations
+        .where((song) => !existingIds.contains(song['ytid']?.toString()))
+        .toList();
+
+    _playlistRecommendationsCache[playlistId] = filtered;
+    return filtered;
+  } catch (e, stackTrace) {
+    logger.log(
+      'Error in getRecommendedSongsForPlaylist',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return [];
+  }
+}
+
+/// Uniformly samples up to [count] valid songs in one pass without copying or shuffling the playlist.
+List<Map> _sampleSeedSongs(List songs, int count) {
+  final random = Random();
+  final reservoir = <Map>[];
+  var seen = 0;
+
+  for (final song in songs) {
+    if (song is! Map || (song['ytid']?.toString() ?? '').isEmpty) continue;
+    seen++;
+    if (reservoir.length < count) {
+      reservoir.add(song);
+    } else {
+      final slot = random.nextInt(seen);
+      if (slot < count) reservoir[slot] = song;
+    }
+  }
+
+  return reservoir;
 }
 
 Future<List> _getRecommendationsFromMixedSources() async {
@@ -230,6 +310,12 @@ Future<List> _getRecommendationsFromMixedSources() async {
     ...userLikedSongsList.value,
     ...userRecentlyPlayed.value,
   ];
+
+  if (globalSongs.isEmpty) {
+    const playlistId = 'PLgzTt0k8mXzEk586ze4BjvDXR7c-TUSnx';
+    globalSongs = await getSongsFromPlaylist(playlistId);
+  }
+  playlistSongs.addAll(globalSongs.take(10));
 
   if (userCustomPlaylists.value.isNotEmpty) {
     for (final userPlaylist in userCustomPlaylists.value) {
@@ -250,107 +336,12 @@ List _deduplicateAndShuffle(List playlistSongs) {
   for (final song in playlistSongs) {
     if (song['ytid'] != null && seenYtIds.add(song['ytid'])) {
       uniqueSongs.add(song);
+      // Early exit when we have enough songs
       if (uniqueSongs.length >= 15) break;
     }
   }
 
   return uniqueSongs;
-}
-
-/// Fetches Quick Picks: related songs based on a random seed from recent history.
-Future<List> getQuickPicks() async {
-    try {
-      List<Map> seedSongs = [];
-      
-      if (userRecentlyPlayed.value.isNotEmpty) {
-        // Get top 50 most played
-        final sortedByPlays = List.from(userRecentlyPlayed.value)
-          ..sort((a, b) {
-            final countA = (a['listeningCount'] ?? 0) as int;
-            final countB = (b['listeningCount'] ?? 0) as int;
-            return countB.compareTo(countA);
-          });
-        
-        // Get top 50 most recent
-        final topRecent = userRecentlyPlayed.value.take(50).toList();
-        
-        // Combine and shuffle, then take up to 4 distinct songs
-        final combined = [...sortedByPlays.take(50), ...topRecent];
-        combined.shuffle();
-        
-        final distinctYtids = <String>{};
-        for (final song in combined) {
-          if (song is Map && song['ytid'] != null) {
-            if (distinctYtids.add(song['ytid'].toString())) {
-              seedSongs.add(song);
-              if (seedSongs.length >= 4) break;
-            }
-          }
-        }
-      }
-
-      if (seedSongs.isNotEmpty) {
-        List<dynamic> finalMix = [];
-        
-        // 1. Add the seed songs themselves to the mix
-        finalMix.addAll(seedSongs);
-        
-        // 2. Fetch related songs for each seed concurrently
-        final relatedFutures = seedSongs.map((song) => _saavn.getRelatedSongs(song['ytid'].toString()));
-        final relatedResults = await Future.wait(relatedFutures);
-        
-        // 3. Add a few related songs from each seed
-        for (final relatedList in relatedResults) {
-          if (relatedList.isNotEmpty) {
-            final formatted = relatedList.take(6).map((s) => _saavn.formatSong(s)).toList();
-            finalMix.addAll(formatted);
-          }
-        }
-        
-        // 4. Shuffle the final mix and remove duplicates
-        finalMix.shuffle();
-        final distinctMix = <dynamic>[];
-        final seenIds = <String>{};
-        
-        for (final song in finalMix) {
-          final id = song['ytid']?.toString() ?? '';
-          if (id.isNotEmpty && seenIds.add(id)) {
-            distinctMix.add(song);
-          }
-          if (distinctMix.length >= 20) break;
-        }
-        
-        if (distinctMix.isNotEmpty) {
-          return distinctMix;
-        }
-      }
-
-      // Fallback: return trending songs as quick picks
-      return getTrendingSongs();
-    } catch (e, stackTrace) {
-      logger.log('Error in getQuickPicks', error: e, stackTrace: stackTrace);
-      return [];
-    }
-  }
-
-/// Returns the top 10 most-played songs from local history for Speed Dial.
-/// No network call needed — purely local Hive data.
-List getSpeedDial() {
-  try {
-    if (userRecentlyPlayed.value.isEmpty) return [];
-
-    final sorted = List.from(userRecentlyPlayed.value)
-      ..sort((a, b) {
-        final countA = (a['listeningCount'] ?? 0) as int;
-        final countB = (b['listeningCount'] ?? 0) as int;
-        return countB.compareTo(countA);
-      });
-
-    return sorted.take(10).toList();
-  } catch (e, stackTrace) {
-    logger.log('Error in getSpeedDial', error: e, stackTrace: stackTrace);
-    return [];
-  }
 }
 
 Future<void> updateSongLikeStatus(
@@ -499,9 +490,7 @@ Future<void> renameSongInLikedSongs(
 
 bool isSongAlreadyLiked(songIdToCheck) {
   final songId = songIdToCheck?.toString();
-  return userLikedSongsList.value.any(
-    (song) => song['ytid']?.toString() == songId,
-  );
+  return songId != null && _cachedLikedSongIds.contains(songId);
 }
 
 bool isPlaylistAlreadyLiked(playlistIdToCheck) {
@@ -512,8 +501,38 @@ bool isPlaylistAlreadyLiked(playlistIdToCheck) {
   );
 }
 
-bool isSongAlreadyOffline(songIdToCheck) =>
-    userOfflineSongs.value.any((song) => song['ytid'] == songIdToCheck);
+bool isRadioStationLiked(String radioStationId) {
+  return userLikedRadioStations.value.contains(radioStationId);
+}
+
+Future<void> addRadioStationToLiked(String radioStationId) async {
+  if (!userLikedRadioStations.value.contains(radioStationId)) {
+    final updatedList = List<String>.from(userLikedRadioStations.value)
+      ..add(radioStationId);
+    userLikedRadioStations.value = updatedList;
+    await addOrUpdateData<List<String>>(
+      'user',
+      'likedRadioStations',
+      updatedList,
+    );
+  }
+}
+
+Future<void> removeRadioStationFromLiked(String radioStationId) async {
+  if (userLikedRadioStations.value.contains(radioStationId)) {
+    final updatedList = List<String>.from(userLikedRadioStations.value)
+      ..remove(radioStationId);
+    userLikedRadioStations.value = updatedList;
+    unawaited(
+      addOrUpdateData<List<String>>('user', 'likedRadioStations', updatedList),
+    );
+  }
+}
+
+bool isSongAlreadyOffline(songIdToCheck) {
+  final songId = songIdToCheck?.toString();
+  return songId != null && _cachedOfflineSongIds.contains(songId);
+}
 
 bool isPlaylistFullyOffline(List songs) {
   if (songs.isEmpty) return false;
@@ -563,31 +582,77 @@ Future<List<String>> getSearchSuggestions(String query) async {
   //   logger.log('Error in getSearchSuggestions:$e\n$stackTrace');
   // }
 
-  // JioSaavn autocomplete:
-  final suggestions = await _saavn.getSearchSuggestions(query);
+  // Built-in implementation:
+
+  final suggestions = await ytClient.search.getQuerySuggestions(query);
+
   return suggestions;
 }
 
-Future<List<Map<String, int>>> getSkipSegments(String id) async {
-  return [];
+// Throws on network, HTTP and parsing failure instead of swallowing it, so
+// callers that need to tell "confirmed no segments" apart from "failed to
+// fetch" (e.g. the offline cache, which must not persist a false negative)
+// can do so.
+Future<List<Map<String, int>>> _fetchSkipSegments(String id) async {
+  final res = await ProxyManager().getProxiedResponse(
+    Uri(
+      scheme: 'https',
+      host: 'sponsor.ajay.app',
+      path: '/api/skipSegments',
+      queryParameters: {
+        'videoID': id,
+        'category': [
+          'sponsor',
+          'selfpromo',
+          'interaction',
+          'intro',
+          'outro',
+          'music_offtopic',
+        ],
+        'actionType': 'skip',
+      },
+    ),
+  );
+  // 404 is how the API answers "this video has no segments", so it is a real
+  // empty result and safe to remember. Any other non-200 is a failure, and
+  // throwing keeps it from being stored as a confirmed "no segments".
+  if (res.statusCode == 404 || res.body == 'Not Found') return [];
+  if (res.statusCode != 200) {
+    throw HttpException('SponsorBlock responded ${res.statusCode} for $id');
+  }
+
+  final data = jsonDecode(res.body);
+  final segments = data.map((obj) {
+    return Map.castFrom<String, dynamic, String, int>({
+      'start': obj['segment'].first.toInt(),
+      'end': obj['segment'].last.toInt(),
+    });
+  }).toList();
+  return List.castFrom<dynamic, Map<String, int>>(segments);
 }
 
-List<dynamic> nextRecommendedSongs = [];
+Future<List<Map<String, int>>> getSkipSegments(String id) async {
+  try {
+    return await _fetchSkipSegments(id);
+  } catch (e, stackTrace) {
+    logger.log('Error in getSkipSegments', error: e, stackTrace: stackTrace);
+    return [];
+  }
+}
 
 Future<void> getSimilarSong(String songYtId) async {
   try {
-    var related = await _saavn.getRelatedSongs(songYtId);
-    
-    if (related.isEmpty) {
-      logger.log('No related songs found for $songYtId even after artist fallback.');
-      // DO NOT fallback to generic trending songs to avoid polluting niche playlists
-    }
+    final song = await ytClient.videos.get(songYtId);
+    final relatedSongs = await ytClient.videos.getRelatedVideos(song) ?? [];
 
-    if (related.isNotEmpty) {
-      nextRecommendedSongs = related
-          .take(50)
-          .map((s) => _saavn.formatSong(s))
+    if (relatedSongs.isNotEmpty) {
+      nextRecommendedSongs = relatedSongs
+          .where((s) => s.duration != null && s.duration!.inMinutes <= 15)
+          .take(20)
+          .map((s) => returnSongLayout(0, s))
           .toList();
+    } else {
+      logger.log('No related songs found for $songYtId');
     }
   } catch (e, stackTrace) {
     logger.log(
@@ -598,18 +663,129 @@ Future<void> getSimilarSong(String songYtId) async {
   }
 }
 
-/// Resolves a playable stream URL for a song from JioSaavn.
-/// JioSaavn URLs are direct MP4 links — no proxy needed.
+/// In-memory cache of the audio stream picked for a song at the current
+/// quality setting. The Hive cache only keeps the URL, so without this every
+/// caller that needs the stream itself (bitrate, codec) would fetch the
+/// manifest again right after playback already resolved it.
+final Map<String, ({AudioOnlyStreamInfo stream, DateTime resolvedAt})>
+_selectedAudioStreams = {};
+
+const _maxSelectedAudioStreams = 50;
+
+String _selectedAudioStreamKey(String songId) =>
+    '${songId}_${audioQualitySetting.value}';
+
+/// Returns the stream resolved earlier for a song, unless it is old enough
+/// that its URL may have expired.
+AudioOnlyStreamInfo? _getSelectedAudioStream(String songId) {
+  final key = _selectedAudioStreamKey(songId);
+  final entry = _selectedAudioStreams[key];
+  if (entry == null) return null;
+
+  if (DateTime.now().difference(entry.resolvedAt) > _cacheValidationDuration) {
+    _selectedAudioStreams.remove(key);
+    return null;
+  }
+
+  return entry.stream;
+}
+
+void _cacheSelectedAudioStream(String songId, AudioOnlyStreamInfo stream) {
+  if (_selectedAudioStreams.length >= _maxSelectedAudioStreams) {
+    _selectedAudioStreams.remove(_selectedAudioStreams.keys.first);
+  }
+
+  _selectedAudioStreams[_selectedAudioStreamKey(songId)] = (
+    stream: stream,
+    resolvedAt: DateTime.now(),
+  );
+}
+
+/// Drops both cached forms of a song's stream, so the next request resolves
+/// it again. Used when a cached URL turns out to be dead.
+Future<void> invalidateSongStreamCache(String songId) async {
+  _selectedAudioStreams.remove(_selectedAudioStreamKey(songId));
+  await deleteData('cache', 'song_${songId}_${audioQualitySetting.value}_url');
+}
+
+/// Fetches the best available audio stream for a song.
+Future<AudioOnlyStreamInfo?> fetchBestAudioStream(String? songId) async {
+  try {
+    if (songId == null || songId.isEmpty) {
+      logger.log('fetchBestAudioStream: songId is null or empty');
+      return null;
+    }
+
+    final cachedStream = _getSelectedAudioStream(songId);
+    if (cachedStream != null) return cachedStream;
+
+    final manifest = await _fetchStreamManifest(songId);
+    final audioStream = manifest?.audioOnly;
+    if (audioStream == null || audioStream.isEmpty) {
+      logger.log('fetchBestAudioStream: no audio streams for $songId');
+      return null;
+    }
+
+    final selectedStream = selectAudioOnlyStreamForQuality(audioStream);
+    if (selectedStream == null) {
+      logger.log(
+        'fetchBestAudioStream: no compatible audio streams for $songId',
+      );
+      return null;
+    }
+
+    _cacheSelectedAudioStream(songId, selectedStream);
+    return selectedStream;
+  } on TimeoutException catch (_) {
+    logger.log('fetchBestAudioStream request timed out for $songId');
+    return null;
+  } catch (e, stackTrace) {
+    logger.log(
+      'Error while fetching best audio stream',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return null;
+  }
+}
+
+/// Resolves a playable stream URL for a song (cached when possible).
 Future<String?> fetchSongStreamUrl(String songId, bool isLive) async {
   try {
     if (songId.isEmpty) {
       logger.log('fetchSongStreamUrl: songId is empty');
       return null;
     }
+    if (isLive) {
+      final streamInfo = await ytClient.videos.streamsClient
+          .getHttpLiveStreamUrl(VideoId(songId));
+      return streamInfo;
+    }
 
-    // For JioSaavn songs, we return a marker that tells the audio service
-    // to resolve the actual URL lazily (from the song's encrypted_media_url).
-    return 'jiosaavn_lazy_resolve';
+    const _cacheDuration = Duration(hours: 3);
+    final cacheKey = 'song_${songId}_${audioQualitySetting.value}_url';
+
+    // Try to get from cache
+    final cachedUrl = await _getCachedSongUrl(cacheKey, _cacheDuration);
+    if (cachedUrl != null) {
+      return cachedUrl;
+    }
+
+    // Get fresh URL, reusing the stream already resolved for this song.
+    final selectedStream = await fetchBestAudioStream(songId);
+    if (selectedStream == null) {
+      logger.log('fetchSongStreamUrl: no audio streams for $songId');
+      return null;
+    }
+
+    final url = selectedStream.url.toString();
+
+    unawaited(addOrUpdateData<String>('cache', cacheKey, url));
+
+    return url;
+  } on TimeoutException catch (_) {
+    logger.log('fetchSongStreamUrl request timed out for $songId');
+    return null;
   } catch (e, stackTrace) {
     logger.log(
       'Error in fetchSongStreamUrl for $songId:',
@@ -620,27 +796,13 @@ Future<String?> fetchSongStreamUrl(String songId, bool isLive) async {
   }
 }
 
-/// Resolve the actual direct stream URL for a JioSaavn song.
-/// Called lazily when playback actually starts.
-String? resolveJioSaavnStreamUrl(Map song) {
-  final encryptedUrl = song['encrypted_media_url']?.toString();
-  if (encryptedUrl == null || encryptedUrl.isEmpty) {
-    logger.log('resolveJioSaavnStreamUrl: no encrypted_media_url');
-    return null;
-  }
-  return _saavn.getSongStreamUrl(encryptedUrl);
-}
-
 Future<Map<String, dynamic>> getSongDetails(
   int songIndex,
   String songId,
 ) async {
   try {
-    final song = await _saavn.getSongDetails(songId);
-    if (song != null) {
-      return _saavn.formatSong(song, index: songIndex);
-    }
-    throw Exception('Song not found: $songId');
+    final song = await ytClient.videos.get(songId);
+    return returnSongLayout(songIndex, song);
   } catch (e, stackTrace) {
     logger.log(
       'Error while getting song details',
@@ -683,6 +845,7 @@ Future<bool> makeSongOffline(dynamic song) async {
     if (isSongAlreadyOffline(ytid)) {
       final existingPath = FilePaths.getAudioPath(ytid);
       if (await File(existingPath).exists()) {
+        unawaited(cacheSponsorBlockSegments(ytid));
         return true;
       }
     }
@@ -695,28 +858,33 @@ Future<bool> makeSongOffline(dynamic song) async {
 
     await audioFile.parent.create(recursive: true);
 
+    int? audioBitrateKbps;
+    String? audioCodec;
+    IOSink? fileStream;
     try {
-      // Resolve the direct stream URL from JioSaavn
-      final streamUrl = resolveJioSaavnStreamUrl(offlineSong);
-      if (streamUrl == null || streamUrl.isEmpty) {
-        logger.log('makeSongOffline: no stream URL for $ytid');
+      final audioManifest = await fetchBestAudioStream(ytid);
+      if (audioManifest == null) {
+        logger.log('makeSongOffline: audioManifest is null for $ytid');
         return false;
       }
+      audioBitrateKbps = audioManifest.bitrate.kiloBitsPerSecond.round();
+      audioCodec = audioManifest.audioCodec;
 
-      // Download the MP4 audio file directly
-      final response = await http.get(Uri.parse(streamUrl));
-      if (response.statusCode != 200) {
-        logger.log('makeSongOffline: download failed with ${response.statusCode}');
-        return false;
-      }
-      await audioFile.writeAsBytes(response.bodyBytes);
+      final stream = ytClient.videos.streamsClient.get(audioManifest);
+      fileStream = audioFile.openWrite();
+      await stream.pipe(fileStream);
+      await fileStream.flush();
+      await fileStream.close();
+      fileStream = null;
     } catch (e, stackTrace) {
       logger.log(
         'Error downloading audio file',
         error: e,
         stackTrace: stackTrace,
       );
-      // file stream is no longer used
+      try {
+        await fileStream?.close();
+      } catch (_) {}
       if (await audioFile.exists()) {
         await audioFile.delete();
       }
@@ -746,6 +914,8 @@ Future<bool> makeSongOffline(dynamic song) async {
     }
 
     offlineSong['audioPath'] = audioFile.path;
+    offlineSong['audioBitrateKbps'] = audioBitrateKbps;
+    offlineSong['audioCodec'] = audioCodec;
     offlineSong['dateAdded'] = DateTime.now().millisecondsSinceEpoch;
 
     try {
@@ -768,6 +938,8 @@ Future<bool> makeSongOffline(dynamic song) async {
           userOfflineSongs.value,
         ),
       );
+
+      unawaited(cacheSponsorBlockSegments(ytid));
     } catch (e, st) {
       logger.log(
         'Error updating global offline songs list',
@@ -835,9 +1007,84 @@ Future<bool> removeSongFromOffline(dynamic songId) async {
   }
 }
 
+const _sponsorCallSpacing = Duration(seconds: 1);
+Future<void> _sponsorSerialChain = Future.value();
+
+/// Runs SponsorBlock lookups one at a time, spaced out, so that a playlist
+/// download finishing several songs at once does not fire them all together.
+Future<T> _sponsorSerialCall<T>(Future<T> Function() action) {
+  final result = _sponsorSerialChain.then((_) => action());
+  _sponsorSerialChain = result
+      .then((_) {}, onError: (_) {})
+      .then((_) => Future<void>.delayed(_sponsorCallSpacing));
+  return result;
+}
+
+/// Stores the SponsorBlock segments of a downloaded song next to the download
+/// itself, so they last exactly as long as it does: they are not backed up,
+/// they never expire, and removing the song removes them.
+///
+/// Looked up once per song: a stored result — including a confirmed empty one —
+/// is never fetched again.
+Future<void> cacheSponsorBlockSegments(String ytid) async {
+  try {
+    if (getOfflineSongByYtid(ytid)['sponsorSegments'] != null) return;
+
+    // Two attempts, spaced out by the queue above; a failure stores nothing so
+    // it is not mistaken for a confirmed "no segments", and is looked up again
+    // the next time the song plays.
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final segments = await _sponsorSerialCall(
+          () => _fetchSkipSegments(ytid),
+        );
+        await _storeSponsorBlockSegments(ytid, segments);
+        return;
+      } catch (_) {
+        continue;
+      }
+    }
+  } catch (e, stackTrace) {
+    logger.log(
+      'Error caching sponsor block for $ytid',
+      error: e,
+      stackTrace: stackTrace,
+    );
+  }
+}
+
+Future<void> _storeSponsorBlockSegments(
+  String ytid,
+  List<Map<String, int>> segments,
+) async {
+  final index = userOfflineSongs.value.indexWhere((s) => s['ytid'] == ytid);
+  // The song was removed while the lookup was in flight.
+  if (index == -1) return;
+
+  final updatedOfflineSongs = List.from(userOfflineSongs.value);
+  updatedOfflineSongs[index] = {
+    ...Map<String, dynamic>.from(updatedOfflineSongs[index] as Map),
+    'sponsorSegments': segments,
+  };
+  userOfflineSongs.value = updatedOfflineSongs;
+  await addOrUpdateData<List>(
+    'userNoBackup',
+    'offlineSongs',
+    userOfflineSongs.value,
+  );
+}
+
+/// The stored segments of a downloaded song, or null when it has none stored
+/// yet. An empty list means the song was looked up and has no segments.
+List<Map<String, int>>? getCachedSponsorBlockSegments(String ytid) {
+  final stored = getOfflineSongByYtid(ytid)['sponsorSegments'];
+  if (stored is! List) return null;
+  return [for (final segment in stored) Map<String, int>.from(segment as Map)];
+}
+
 Future<File?> _downloadAndSaveArtworkFile(String url, String filePath) async {
   try {
-    final response = await http.get(Uri.parse(url));
+    final response = await ProxyManager().getProxiedResponse(Uri.parse(url));
 
     if (response.statusCode == 200) {
       final file = File(filePath);
@@ -877,12 +1124,14 @@ const recentlyPlayedSongsLimit = 100;
 /// locally (e.g. from [userOfflineSongs]).
 Future<void> updateRecentlyPlayed(dynamic songId, {Map? songFallback}) async {
   try {
+    final now = DateTime.now();
+
     if (userRecentlyPlayed.value.isNotEmpty &&
         userRecentlyPlayed.value[0]['ytid'] == songId) {
       final updatedList = List.from(userRecentlyPlayed.value);
       final existing = Map.from(updatedList[0] as Map);
       existing['listeningCount'] = (existing['listeningCount'] ?? 0) + 1;
-      existing['lastPlayed'] = DateTime.now();
+      existing['lastPlayed'] = now;
       updatedList[0] = existing;
       userRecentlyPlayed.value = updatedList;
       unawaited(
@@ -908,14 +1157,22 @@ Future<void> updateRecentlyPlayed(dynamic songId, {Map? songFallback}) async {
     if (existingIndex != -1) {
       final song = Map.from(updatedList.removeAt(existingIndex) as Map);
       song['listeningCount'] = (song['listeningCount'] ?? 0) + 1;
-      song['lastPlayed'] = DateTime.now();
+      song['lastPlayed'] = now;
       updatedList.insert(0, song);
     } else {
-      final newSongDetails = songFallback != null
+      final dynamic fetchedSongDetails = songFallback != null
           ? Map<String, dynamic>.from(songFallback)
           : await getSongDetails(0, songId);
+
+      if (fetchedSongDetails is! Map) {
+        logger.log('Failed to update recently played: invalid song details');
+        return;
+      }
+
+      final newSongDetails = Map<String, dynamic>.from(fetchedSongDetails);
+      newSongDetails['ytid'] ??= songId;
       newSongDetails['listeningCount'] = 1;
-      newSongDetails['lastPlayed'] = DateTime.now();
+      newSongDetails['lastPlayed'] = now;
       updatedList.insert(0, newSongDetails);
     }
 
@@ -950,4 +1207,75 @@ Future<void> removeFromRecentlyPlayed(dynamic songId) async {
   }
 }
 
+// ===== UI compatibility layer =====
+List<dynamic> nextRecommendedSongs = [];
+int _currentSearchPage = 1;
+String _lastSearchQuery = '';
 
+Future<Map<String, dynamic>> fetchSongsListWithPagination(String searchQuery) async {
+  try {
+    _currentSearchPage = 1;
+    _lastSearchQuery = searchQuery;
+    final results = await fetchSongsList(searchQuery);
+    return {'songs': results, 'nextPage': null};
+  } catch (e, stackTrace) {
+    logger.log('Error in fetchSongsListWithPagination', error: e, stackTrace: stackTrace);
+    return {'songs': [], 'nextPage': null};
+  }
+}
+
+Future<Map<String, dynamic>> fetchNextSongsList(dynamic currentList) async {
+  if (currentList == null) return {'songs': [], 'nextPage': null};
+  return {'songs': [], 'nextPage': null};
+}
+
+Future<List> getQuickPicks() async {
+  try {
+    return await getRecommendedSongs();
+  } catch (e, stackTrace) {
+    logger.log('Error in getQuickPicks', error: e, stackTrace: stackTrace);
+    return [];
+  }
+}
+
+List getSpeedDial() {
+  try {
+    if (userRecentlyPlayed.value.isEmpty) return [];
+    final sorted = List.from(userRecentlyPlayed.value)
+      ..sort((a, b) {
+        final countA = (a['listeningCount'] ?? 0) as int;
+        final countB = (b['listeningCount'] ?? 0) as int;
+        return countB.compareTo(countA);
+      });
+    return sorted.take(10).toList();
+  } catch (e, stackTrace) {
+    logger.log('Error in getSpeedDial', error: e, stackTrace: stackTrace);
+    return [];
+  }
+}
+
+/// Returns trending songs (uses YouTube recommendations as trending source).
+List _trendingCache = [];
+DateTime? _trendingCacheTime;
+
+Future<List> getTrendingSongs() async {
+  try {
+    // Return cached result if less than 30 minutes old
+    if (_trendingCache.isNotEmpty &&
+        _trendingCacheTime != null &&
+        DateTime.now().difference(_trendingCacheTime!).inMinutes < 30) {
+      return _trendingCache;
+    }
+    final results = await ytClient.search.search('india trending songs');
+    final songs = results.map((video) => returnSongLayout(0, video)).toList();
+    if (songs.isNotEmpty) {
+      _trendingCache = songs;
+      _trendingCacheTime = DateTime.now();
+    }
+    return songs;
+  } catch (e, stackTrace) {
+    logger.log('Error in getTrendingSongs', error: e, stackTrace: stackTrace);
+    if (_trendingCache.isNotEmpty) return _trendingCache;
+    return [];
+  }
+}

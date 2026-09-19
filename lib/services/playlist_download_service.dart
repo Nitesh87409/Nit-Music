@@ -1,11 +1,32 @@
 // ignore_for_file: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
 
+/*
+ *     Copyright (C) 2026 Valeri Gokadze
+ *
+ *     Musify is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     Musify is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *     You should have received a copy of the GNU General Public License
+ *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ *
+ *     For more information about Musify, including how to contribute,
+ *     please visit: https://github.com/gokadzev/Musify
+ */
+
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
+import 'package:flutter/material.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
@@ -45,8 +66,44 @@ class OfflinePlaylistService {
     );
   }
 
+  Map? getOfflinePlaylist(String playlistId) {
+    for (final playlist in offlinePlaylists.value) {
+      if (playlist is Map && playlist['ytid']?.toString() == playlistId) {
+        return playlist;
+      }
+    }
+    return null;
+  }
+
   bool isPlaylistDownloading(String playlistId) {
     return activeDownloads.contains(playlistId);
+  }
+
+  /// Marks [playlist] offline when all of its songs are available locally.
+  void checkAndAutoMarkOffline(Map playlist) {
+    final id = playlist['ytid']?.toString();
+    final pList = playlist['list'] as List?;
+    if (id == null || pList == null || pList.isEmpty) return;
+    if (isPlaylistDownloaded(id)) return;
+
+    final offlineSongIds = userOfflineSongs.value.map((s) => s['ytid']).toSet();
+    if (!pList.every((s) => offlineSongIds.contains(s['ytid']))) return;
+
+    offlinePlaylists.value = [
+      ...offlinePlaylists.value,
+      {
+        ...playlist,
+        'list': pList,
+        'downloadedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+    ];
+    unawaited(
+      addOrUpdateData<List>(
+        'userNoBackup',
+        'offlinePlaylists',
+        offlinePlaylists.value,
+      ),
+    );
   }
 
   Future<void> downloadPlaylist(BuildContext context, Map playlist) async {
@@ -155,6 +212,40 @@ class OfflinePlaylistService {
           updatedPlaylists.add(offlinePlaylist);
         }
 
+        // Also mark albums/playlists whose songs are now fully offline
+        final offlineSongIds = userOfflineSongs.value
+            .map((s) => s['ytid'])
+            .toSet();
+
+        final seenIds = <String>{};
+        final userPlaylistSources =
+            <Map>[
+              ...userCustomPlaylists.value,
+              ...userLikedPlaylists.value,
+              for (final folder in userPlaylistFolders.value)
+                ...List<Map>.from(folder['playlists'] ?? []),
+              ...playlists,
+            ].where((p) {
+              final id = p['ytid']?.toString();
+              return id != null && seenIds.add(id);
+            }).toList();
+        for (final p in userPlaylistSources) {
+          final pList = p['list'] as List?;
+          if (pList == null ||
+              pList.isEmpty ||
+              p['ytid'] == playlistId ||
+              isPlaylistDownloaded(p['ytid']?.toString() ?? '')) {
+            continue;
+          }
+          if (pList.every((s) => offlineSongIds.contains(s['ytid']))) {
+            updatedPlaylists.add({
+              ...p,
+              'list': pList,
+              'downloadedAt': DateTime.now().millisecondsSinceEpoch,
+            });
+          }
+        }
+
         offlinePlaylists.value = updatedPlaylists;
         unawaited(
           addOrUpdateData<List>(
@@ -250,6 +341,10 @@ class OfflinePlaylistService {
 
       // Get songs that are only in this playlist
       final songsInPlaylist = playlist['list'] as List<dynamic>? ?? [];
+      final songIdsUsedElsewhere = _getSongIdsUsedElsewhere(
+        normalizedPlaylistId,
+      );
+
       for (final song in songsInPlaylist) {
         try {
           final songId = song['ytid'] as String?;
@@ -258,32 +353,8 @@ class OfflinePlaylistService {
             continue;
           }
 
-          // Check if this song is used in other offline playlists
-          final isUsedInOtherPlaylists = offlinePlaylists.value
-              .where(
-                (p) =>
-                    p is Map && p['ytid']?.toString() != normalizedPlaylistId,
-              ) // Exclude current playlist
-              .any((p) {
-                final playlistSongs = p['list'] as List<dynamic>? ?? [];
-                return playlistSongs.any((s) => s['ytid'] == songId);
-              });
-
-          // Also check if song is in user's liked songs or OTHER custom playlists
-          final isInLikedSongs = userLikedSongsList.value.any(
-            (s) => s['ytid'] == songId,
-          );
-          final isInOtherCustomPlaylists = getUserCustomPlaylists()
-              .where((p) => p['ytid']?.toString() != normalizedPlaylistId)
-              .any((p) {
-                final customPlaylistSongs = p['list'] as List<dynamic>? ?? [];
-                return customPlaylistSongs.any((s) => s['ytid'] == songId);
-              });
-
-          // Only remove if not used elsewhere
-          if (!isUsedInOtherPlaylists &&
-              !isInLikedSongs &&
-              !isInOtherCustomPlaylists) {
+          // Only remove if not used elsewhere.
+          if (!songIdsUsedElsewhere.contains(songId)) {
             await removeSongFromOffline(songId);
           }
         } catch (e, stackTrace) {
@@ -315,6 +386,70 @@ class OfflinePlaylistService {
         stackTrace: stackTrace,
       );
     }
+  }
+
+  /// Removes [songId] from offline storage and updates offline playlist flags.
+  Future<bool> removeSongFromOfflineAndResync(String songId) async {
+    final success = await removeSongFromOffline(songId);
+    if (success) {
+      unawaited(_resyncOfflinePlaylistFlags());
+    }
+    return success;
+  }
+
+  /// Removes stale entries from [offlinePlaylists].
+  Future<void> _resyncOfflinePlaylistFlags() async {
+    final current = offlinePlaylists.value;
+    final stillFullyOffline = <dynamic>[];
+    var changed = false;
+
+    for (final playlist in current) {
+      if (playlist is! Map) {
+        stillFullyOffline.add(playlist);
+        continue;
+      }
+
+      final songs = playlist['list'] as List<dynamic>? ?? [];
+      if (isPlaylistFullyOffline(songs)) {
+        stillFullyOffline.add(playlist);
+      } else {
+        changed = true;
+        logger.log(
+          'Dropping stale offline flag for playlist '
+          '${playlist['ytid']}: no longer fully offline',
+        );
+      }
+    }
+
+    if (!changed) return;
+
+    offlinePlaylists.value = stillFullyOffline;
+    unawaited(
+      addOrUpdateData<List>(
+        'userNoBackup',
+        'offlinePlaylists',
+        offlinePlaylists.value,
+      ),
+    );
+  }
+
+  // Returns a set of song IDs that are used in other playlists or liked songs,
+  Set<String> _getSongIdsUsedElsewhere(String excludedPlaylistId) {
+    final songIds = <String>{
+      for (final playlist in offlinePlaylists.value)
+        if (playlist is Map &&
+            playlist['ytid']?.toString() != excludedPlaylistId)
+          for (final song in playlist['list'] as List<dynamic>? ?? [])
+            if (song['ytid'] is String) song['ytid'] as String,
+      for (final song in userLikedSongsList.value)
+        if (song['ytid'] is String) song['ytid'] as String,
+      for (final playlist in getUserCustomPlaylists())
+        if (playlist['ytid']?.toString() != excludedPlaylistId)
+          for (final song in playlist['list'] as List<dynamic>? ?? [])
+            if (song['ytid'] is String) song['ytid'] as String,
+    };
+
+    return songIds;
   }
 
   Future<void> deleteAllDownloads() async {

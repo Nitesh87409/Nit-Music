@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
+import 'package:musify/services/artist_service.dart' show fetchMoreArtistSongs;
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
@@ -198,11 +199,54 @@ class _PlaylistPageState extends State<PlaylistPage> {
   }
 
   Future<void> _loadMoreArtistSongs() async {
-    // JioSaavn API pagination for artists is not implemented yet.
-    // The current catalog returns top songs directly.
+    if (_isLoadingMoreArtistSongs || !widget.isArtist) return;
+
+    final unfetchedReleases = _playlist['unfetchedReleases'] as List<dynamic>?;
+    if (unfetchedReleases == null || unfetchedReleases.isEmpty) {
+      setState(() {
+        _playlist['isCatalogComplete'] = true;
+      });
+      return;
+    }
+
     setState(() {
-      _playlist['isCatalogComplete'] = true;
+      _isLoadingMoreArtistSongs = true;
     });
+
+    try {
+      final result = await fetchMoreArtistSongs(
+        artistId: _playlist['ytid']?.toString() ?? '',
+        artistName: _playlist['title']?.toString() ?? '',
+        unfetchedReleases: unfetchedReleases,
+      );
+
+      if (mounted) {
+        setState(() {
+          final currentList = _playlist['list'] as List<dynamic>? ?? [];
+          _playlist['list'] = [...currentList, ...result.newSongs];
+          _playlist['unfetchedReleases'] = result.remainingReleases;
+          if (result.remainingReleases.isEmpty) {
+            _playlist['isCatalogComplete'] = true;
+          }
+          _originalPlaylistList = List<dynamic>.from(_playlist['list']);
+        });
+
+        // Update cache so subsequent opens have this data
+        final cacheKey = 'artist_$_resolvedPlaylistId';
+        await addOrUpdateData<Map>('cache', cacheKey, _playlist);
+      }
+    } catch (e, stack) {
+      logger.log('Error loading more artist songs', error: e, stackTrace: stack);
+      if (mounted) {
+        showToast(context, context.l10n!.error);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMoreArtistSongs = false;
+        });
+      }
+    }
   }
 
   Widget _buildLoadMoreButton() {

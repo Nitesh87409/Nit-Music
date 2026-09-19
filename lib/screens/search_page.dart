@@ -9,10 +9,8 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
-import 'package:musify/services/jiosaavn_api.dart';
+import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
-import 'package:musify/services/search_recommendation_service.dart';
-import 'package:musify/services/smart_search_algorithm.dart';
 import 'package:musify/screens/bottom_navigation_page.dart';
 import 'package:musify/widgets/skeleton_loader.dart';
 import 'package:musify/utilities/app_utils.dart';
@@ -157,7 +155,7 @@ class _SearchPageState extends State<SearchPage> {
 
   Future<void> _loadRecommendations() async {
     try {
-      final results = await getSmartSearchRecommendations();
+      final results = await getRecommendedSongs();
       if (mounted) {
         setState(() {
           _recommendations = results;
@@ -218,11 +216,8 @@ class _SearchPageState extends State<SearchPage> {
       return;
     }
     
-    // We no longer use YouTube autocomplete. We only use SmartSearchAlgorithm.
     _fetchingSongs.value = true;
-    
-    // Always clean the query using SmartSearchAlgorithm
-    String optimizedQuery = SmartSearchAlgorithm().getCleanedQuery(query);
+    final optimizedQuery = query;
 
     if (!_isHandlingBack && optimizedQuery.isNotEmpty) {
       if (_searchStack.isEmpty || _searchStack.last != optimizedQuery) {
@@ -237,15 +232,12 @@ class _SearchPageState extends State<SearchPage> {
       unawaited(addOrUpdateData<List>('user', 'searchHistory', updatedHistory));
     }
 
-    // Update search frequency for smart recommendations
-    unawaited(updateSearchFrequency(optimizedQuery));
-
     try {
       final results = await Future.wait<dynamic>([
         fetchSongsListWithPagination(optimizedQuery).timeout(const Duration(seconds: 8), onTimeout: () => {'songs': <dynamic>[], 'nextPage': null}),
-        JioSaavnApi.instance.searchArtists(optimizedQuery).timeout(const Duration(seconds: 2), onTimeout: () => <Map<String, dynamic>>[]),
-        JioSaavnApi.instance.searchAlbums(optimizedQuery).timeout(const Duration(seconds: 2), onTimeout: () => <Map<String, dynamic>>[]),
-        JioSaavnApi.instance.searchPlaylists(optimizedQuery).timeout(const Duration(seconds: 2), onTimeout: () => <Map<String, dynamic>>[]),
+        searchArtists(optimizedQuery, limit: 5).timeout(const Duration(seconds: 4), onTimeout: () => <Map<String, dynamic>>[]),
+        Future.value(<dynamic>[]),
+        getPlaylists(query: optimizedQuery).timeout(const Duration(seconds: 10), onTimeout: () => <dynamic>[]),
       ]);
 
       if (requestId != null && requestId != _latestLiveSearchRequest) {
@@ -371,8 +363,7 @@ class _SearchPageState extends State<SearchPage> {
                             const Duration(milliseconds: 300),
                             () async {
                               // Append 'song' to get music-related suggestions only
-                              // Always clean the query using SmartSearchAlgorithm
-                              String searchQuery = SmartSearchAlgorithm().getCleanedQuery(query);
+                              String searchQuery = query;
                               
                               searchQuery = searchQuery.toLowerCase().endsWith('song') 
                                   ? searchQuery 

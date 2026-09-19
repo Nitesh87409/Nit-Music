@@ -22,9 +22,9 @@ class YoutubeHttpClient extends http.BaseClient {
 
   bool get closed => _closed;
 
-  static Map<String, String> defaultHeaders = {
+  static const Map<String, String> defaultHeaders = {
     'user-agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.18 Safari/537.36',
     'cookie': 'CONSENT=YES+cb',
     'accept':
         'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
@@ -182,7 +182,7 @@ class YoutubeHttpClient extends http.BaseClient {
     for (final fragment in streamInfo.fragments) {
       final req = await retry(
         this,
-        () => get(Uri.parse(url.toString() + fragment.path)),
+        () => get(Uri.parse(url.toString() + fragment.path), headers: headers),
       );
       yield req.bodyBytes;
     }
@@ -215,6 +215,12 @@ class YoutubeHttpClient extends http.BaseClient {
             request =
                 http.Request('get', url.setQueryParam('range', '$from-$to'));
           }
+          // NOTE: `headers` was previously accepted but never applied here,
+          // so byte-range downloads always fell back to the generic default
+          // User-Agent regardless of which client resolved the stream URL —
+          // causing 403s for app-style clients (ANDROID_VR, ANDROID, IOS,
+          // VISIONOS) whose URLs are tied to a matching User-Agent.
+          request.headers.addAll(headers);
           return send(request);
         });
         if (validate) {
@@ -290,8 +296,17 @@ class YoutubeHttpClient extends http.BaseClient {
       sendPost(action, {'continuation': token}, headers: headers);
 
   /// Sends a call to the youtube api endpoint.
-  Future<JsonMap> sendPost(String action, Map<String, dynamic> data,
-      {Map<String, String>? headers}) {
+  ///
+  /// [validate] defaults to `false` to preserve existing behavior for
+  /// callers that don't expect a thrown [RequestLimitExceededException] or
+  /// [FatalFailureException]; pass `true` to have those raised instead of
+  /// silently returning whatever body the server sent back.
+  Future<JsonMap> sendPost(
+    String action,
+    Map<String, dynamic> data, {
+    Map<String, String>? headers,
+    bool validate = false,
+  }) {
     assert(action == 'next' || action == 'browse' || action == 'search');
 
     final url = Uri.parse(
@@ -302,17 +317,22 @@ class YoutubeHttpClient extends http.BaseClient {
       'context': const {
         'client': {
           'browserName': 'Chrome',
-          'browserVersion': '125.0.0.0',
+          'browserVersion': '105.0.0.0',
           'clientFormFactor': 'UNKNOWN_FORM_FACTOR',
           'clientName': "WEB",
-          'clientVersion': "2.20260618.05.00",
+          'clientVersion': "2.20220921.00.00",
         },
       },
       ...data,
     };
 
     return retry<JsonMap>(this, () async {
-      final raw = await post(url, body: json.encode(body), headers: headers);
+      final raw = await post(
+        url,
+        body: json.encode(body),
+        headers: headers,
+        validate: validate,
+      );
       if (_closed) throw HttpClientClosedException();
 
       //final now = DateTime.now();
@@ -347,12 +367,10 @@ class YoutubeHttpClient extends http.BaseClient {
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     if (_closed) throw HttpClientClosedException();
 
-    // Apply default headers if they are not already present (case-insensitive check)
+    // Apply default headers if they are not already present
     headers.forEach((key, value) {
-      final lowercaseKey = key.toLowerCase();
-      final hasKey = request.headers.keys.any((k) => k.toLowerCase() == lowercaseKey);
-      if (!hasKey) {
-        request.headers[key] = value;
+      if (request.headers[key] == null) {
+        request.headers[key] = headers[key]!;
       }
     });
 
@@ -361,6 +379,6 @@ class YoutubeHttpClient extends http.BaseClient {
     if (request is http.Request) {
       _logger.finer('Request body: ${request.body}');
     }
-    return _httpClient.send(request).timeout(const Duration(seconds: 8));
+    return _httpClient.send(request);
   }
 }

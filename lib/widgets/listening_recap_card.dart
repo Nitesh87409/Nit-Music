@@ -1,3 +1,24 @@
+/*
+ *     Copyright (C) 2026 Valeri Gokadze
+ *
+ *     Musify is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     Musify is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *     You should have received a copy of the GNU General Public License
+ *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ *
+ *     For more information about Musify, including how to contribute,
+ *     please visit: https://github.com/gokadzev/Musify
+ */
+
 import 'package:flutter/material.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/widgets/song_bar.dart';
@@ -80,6 +101,7 @@ class ListeningRecapCard extends StatelessWidget {
             if (songs.isNotEmpty) ...[
               for (var i = 0; i < songs.length; i++)
                 SongBar(
+                  key: ValueKey(songs[i]['ytid'] ?? i),
                   songs[i],
                   false,
                   showPlayTime: true,
@@ -138,7 +160,7 @@ class _RecapBrandHeader extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Nit Music',
+                      'Musify',
                       maxLines: 1,
                       style: TextStyle(
                         color: colorScheme.onSecondaryContainer,
@@ -147,7 +169,7 @@ class _RecapBrandHeader extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      ' · $periodLabel',
+                      ' Â· $periodLabel',
                       maxLines: 1,
                       style: TextStyle(
                         color: colorScheme.onSecondaryContainer,

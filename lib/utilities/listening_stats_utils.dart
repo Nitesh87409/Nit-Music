@@ -1,3 +1,24 @@
+/*
+ *     Copyright (C) 2026 Valeri Gokadze
+ *
+ *     Musify is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     Musify is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *     You should have received a copy of the GNU General Public License
+ *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ *
+ *     For more information about Musify, including how to contribute,
+ *     please visit: https://github.com/gokadzev/Musify
+ */
+
 const wrappedListeningStatsSchemaVersion = 2;
 const wrappedCurrentMonthSongsLimit = 250;
 const wrappedMonthlyHistorySongsLimit = 15;
@@ -233,9 +254,8 @@ List<Map<String, dynamic>> annualListeningSongsFromMonths(
       existing['playCount'] =
           _readInt(existing['playCount']) + _readInt(source['playCount']);
       existing['listeningCount'] = existing['playCount'];
-      if (_readDate(
-        source['lastPlayed'],
-      ).isAfter(_readDate(existing['lastPlayed']))) {
+      if (_readDate(source['lastPlayed'])
+          .isAfter(_readDate(existing['lastPlayed']))) {
         _copyLatestSongMetadata(existing, source);
       }
       songs[ytid] = existing;
@@ -406,9 +426,8 @@ Map<String, dynamic> _mergeMonthStats(
         _readInt(existing['playCount']) + _readInt(sourceSong['playCount']);
     existing['listeningCount'] = existing['playCount'];
 
-    if (_readDate(
-      sourceSong['lastPlayed'],
-    ).isAfter(_readDate(existing['lastPlayed']))) {
+    if (_readDate(sourceSong['lastPlayed'])
+        .isAfter(_readDate(existing['lastPlayed']))) {
       _copyLatestSongMetadata(existing, sourceSong);
     }
 
@@ -539,7 +558,7 @@ Map<String, dynamic> _retainedHistory(
 }
 
 // A history month is kept on disk (and shown in the UI) only while it stays
-// relevant: earlier months of the current year, plus — during January — the
+// relevant: earlier months of the current year, plus â€” during January â€” the
 // whole previous year so its annual recap is still available. Anything older is
 // dropped on the next normalize (e.g. in February the prior year is pruned),
 // which bounds stored history and the backup to ~13 months. Retention and
@@ -607,14 +626,12 @@ void _copyLatestSongMetadata(
 }
 
 int _compareSongStats(Map<String, dynamic> a, Map<String, dynamic> b) {
-  final playComparison = _readInt(
-    b['playCount'],
-  ).compareTo(_readInt(a['playCount']));
+  final playComparison = _readInt(b['playCount'])
+      .compareTo(_readInt(a['playCount']));
   if (playComparison != 0) return playComparison;
 
-  final secondsComparison = _readInt(
-    b['seconds'],
-  ).compareTo(_readInt(a['seconds']));
+  final secondsComparison = _readInt(b['seconds'])
+      .compareTo(_readInt(a['seconds']));
   if (secondsComparison != 0) return secondsComparison;
 
   return _readDate(b['lastPlayed']).compareTo(_readDate(a['lastPlayed']));
