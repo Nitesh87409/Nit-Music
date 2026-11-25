@@ -21,16 +21,16 @@ class MixCardSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 140,
+      width: 192,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SkeletonLoader(
             child: Container(
-              width: 140,
-              height: 140,
+              width: 192,
+              height: 108,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
                 color: Colors.white,
               ),
             ),

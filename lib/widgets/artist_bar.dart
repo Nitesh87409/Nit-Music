@@ -25,7 +25,7 @@ class ArtistBar extends StatelessWidget {
     final image = normalizeArtistThumbnailUrl(artist['image']?.toString());
 
     return Material(
-      color: colorScheme.surfaceContainerLow,
+      color: Colors.transparent,
       borderRadius: borderRadius,
       clipBehavior: Clip.antiAlias,
       child: InkWell(

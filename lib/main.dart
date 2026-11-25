@@ -29,6 +29,9 @@ import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/utilities/sharing_intent.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:musify/firebase_options.dart';
+import 'package:musify/services/auth_service.dart';
 
 late MusifyAudioHandler audioHandler;
 late StreamSubscription<String?> sharingIntentSubscription;
@@ -163,6 +166,7 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
+      audioHandler.persistPlaybackState();
       listeningStatsService.recordListeningSessionProgress(
         wasPlaying: audioHandler.audioPlayer.playing,
       );
@@ -249,6 +253,11 @@ Future<void> initialisation() async {
   try {
     await Hive.initFlutter();
 
+    // Initialize Firebase
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
     // Initialize Hive models and open boxes
     await Future.wait([
       Hive.openBox('settings'),
@@ -270,6 +279,9 @@ Future<void> initialisation() async {
 
     // Initialize Shake Service
     ShakeService().init();
+
+    // Initialize Auth Service
+    AuthService.instance.init();
 
     // Init router
     NavigationManager.instance;

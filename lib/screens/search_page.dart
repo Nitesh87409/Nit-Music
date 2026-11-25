@@ -48,14 +48,14 @@ void reloadSearchHistoryFromStorage() {
 
 // ─── Mood Chip definitions ───
 const List<Map<String, String>> _moodChips = [
-  {'label': '🎧 Workout', 'query': 'workout songs'},
-  {'label': '💔 Sad', 'query': 'sad songs hindi'},
-  {'label': '🚗 Drive', 'query': 'drive songs'},
-  {'label': '🔥 Trending', 'query': 'trending songs'},
-  {'label': '🧘 Lofi', 'query': 'lofi songs'},
-  {'label': '🎉 Party', 'query': 'party songs'},
-  {'label': '🙏 Bhakti', 'query': 'bhakti songs hindi'},
-  {'label': '🎵 Bollywood', 'query': 'bollywood hits'},
+  {'label': 'Workout', 'query': 'workout songs'},
+  {'label': 'Sad', 'query': 'sad songs hindi'},
+  {'label': 'Drive', 'query': 'drive songs'},
+  {'label': 'Trending', 'query': 'trending songs'},
+  {'label': 'Lofi', 'query': 'lofi songs'},
+  {'label': 'Party', 'query': 'party songs'},
+  {'label': 'Bhakti', 'query': 'bhakti songs hindi'},
+  {'label': 'Bollywood', 'query': 'bollywood hits'},
 ];
 
 class _SearchPageState extends State<SearchPage> {
@@ -83,10 +83,10 @@ class _SearchPageState extends State<SearchPage> {
   // Search filters
   final List<Map<String, String>> _searchFilters = [
     {'label': 'All', 'value': 'All'},
-    {'label': '🎵 Songs', 'value': 'Songs'},
-    {'label': '👤 Artists', 'value': 'Artists'},
-    {'label': '💿 Albums', 'value': 'Albums'},
-    {'label': '▶️ Playlists', 'value': 'Playlists'},
+    {'label': 'Songs', 'value': 'Songs'},
+    {'label': 'Artists', 'value': 'Artists'},
+    {'label': 'Albums', 'value': 'Albums'},
+    {'label': 'Playlists', 'value': 'Playlists'},
   ];
   String _activeFilter = 'All';
 
@@ -122,13 +122,13 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 300) {
       _loadMoreSongs();
     }
   }
 
   Future<void> _loadMoreSongs() async {
-    if (_isLoadingMoreSongs || _songsNextPage == null || _activeFilter != 'Songs') return;
+    if (_isLoadingMoreSongs || _songsNextPage == null || (_activeFilter != 'Songs' && _activeFilter != 'All')) return;
     
     setState(() {
       _isLoadingMoreSongs = true;
@@ -688,7 +688,7 @@ class _SearchPageState extends State<SearchPage> {
               ),
               backgroundColor: colorScheme.surfaceContainerHigh,
               side: BorderSide(
-                color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                color: const Color(0xFFE11D48).withValues(alpha: 0.3),
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -709,11 +709,6 @@ class _SearchPageState extends State<SearchPage> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionTitle(
-            'Recommended For You',
-            primaryColor,
-            icon: FluentIcons.star_24_filled,
-          ),
           for (var i = 0; i < 4; i++) const SongBarSkeleton(),
         ],
       );
@@ -726,18 +721,18 @@ class _SearchPageState extends State<SearchPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionTitle(
-          'Recommended For You',
-          primaryColor,
-          icon: FluentIcons.star_24_filled,
-        ),
         for (var index = 0; index < _recommendations.length; index++)
           SongBar(
             _recommendations[index],
             true,
             key: ValueKey('rec_song_$index'),
             showMusicDuration: true,
-            borderRadius: getItemBorderRadius(index, _recommendations.length),
+            backgroundColor: Colors.transparent,
+            borderRadius: BorderRadius.zero,
+            barPadding: const EdgeInsetsDirectional.symmetric(
+              vertical: 8,
+              horizontal: 4,
+            ),
           ),
       ],
     );
@@ -790,25 +785,27 @@ class _SearchPageState extends State<SearchPage> {
         ),
       );
 
-      final songsCount = _activeFilter == 'Songs' 
-          ? _songsSearchResult.length 
-          : (_songsSearchResult.length > maxSongsInList ? maxSongsInList : _songsSearchResult.length);
+      final songsCount = _songsSearchResult.length;
 
       for (var index = 0; index < songsCount; index++) {
         final song = _songsSearchResult[index];
-        final borderRadius = getItemBorderRadius(index, songsCount);
         widgets.add(
           SongBar(
             song,
             true,
             key: listItemKey('search_song', index, song),
             showMusicDuration: true,
-            borderRadius: borderRadius,
+            backgroundColor: Colors.transparent,
+            borderRadius: BorderRadius.zero,
+            barPadding: const EdgeInsetsDirectional.symmetric(
+              vertical: 8,
+              horizontal: 4,
+            ),
           ),
         );
       }
       
-      if (_activeFilter == 'Songs' && _isLoadingMoreSongs) {
+      if ((_activeFilter == 'Songs' || _activeFilter == 'All') && _isLoadingMoreSongs) {
         widgets.add(
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 20),

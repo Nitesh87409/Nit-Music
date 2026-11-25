@@ -367,8 +367,8 @@ class _SongBarState extends State<SongBar> {
     ]);
     _lowResImageUrl =
         _firstNonEmptyString([
-          widget.song['lowResImage'],
           widget.song['image'],
+          widget.song['lowResImage'],
           widget.song['highResImage'],
         ]) ??
         '';
@@ -434,7 +434,7 @@ class _SongBarState extends State<SongBar> {
         : widget.playCount;
 
     return Material(
-      color: widget.backgroundColor ?? colorScheme.surfaceContainerLow,
+      color: widget.backgroundColor ?? Colors.transparent,
       borderRadius: widget.borderRadius,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -531,7 +531,8 @@ class _SongBarState extends State<SongBar> {
   }
 
   Widget _buildAlbumArt(ColorScheme colorScheme) {
-    const size = 52.0;
+    const width = 80.0;
+    const height = 45.0;
     final isDurationAvailable =
         widget.showMusicDuration && widget.song['duration'] != null;
 
@@ -543,7 +544,8 @@ class _SongBarState extends State<SongBar> {
           _ArtworkDisplay(
             lowResImageUrl: _lowResImageUrl,
             artworkPath: _artworkPath,
-            size: size,
+            width: width,
+            height: height,
             isDurationAvailable: isDurationAvailable,
             colorScheme: colorScheme,
             offlineStatus: _songOfflineStatus,
@@ -745,30 +747,35 @@ String? _firstNonEmptyString(Iterable<Object?> values) {
 class _OfflineArtwork extends StatelessWidget {
   const _OfflineArtwork({
     required this.artworkPath,
-    required this.size,
+    required this.width,
+    required this.height,
     required this.colorScheme,
   });
 
   final String artworkPath;
-  final double size;
+  final double width;
+  final double height;
   final ColorScheme colorScheme;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: size,
-      height: size,
+      width: width,
+      height: height,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: Stack(
           children: [
             Image.file(
               File(artworkPath),
-              width: size,
-              height: size,
+              width: width,
+              height: height,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
-                  NullArtworkWidget(iconSize: 30, size: size),
+              errorBuilder: (_, __, ___) => SizedBox(
+                width: width,
+                height: height,
+                child: NullArtworkWidget(iconSize: 24, size: height),
+              ),
             ),
             Positioned(
               top: 3,
@@ -797,7 +804,8 @@ class _OfflineArtwork extends StatelessWidget {
 class _OnlineArtwork extends StatelessWidget {
   const _OnlineArtwork({
     required this.lowResImageUrl,
-    required this.size,
+    required this.width,
+    required this.height,
     required this.isDurationAvailable,
     required this.colorScheme,
     required this.duration,
@@ -806,7 +814,8 @@ class _OnlineArtwork extends StatelessWidget {
   });
 
   final String lowResImageUrl;
-  final double size;
+  final double width;
+  final double height;
   final bool isDurationAvailable;
   final ColorScheme colorScheme;
   final dynamic duration;
@@ -815,33 +824,27 @@ class _OnlineArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isImageSmall = lowResImageUrl.contains('default.jpg');
-
     return SizedBox(
-      width: size,
-      height: size,
+      width: width,
+      height: height,
       child: Stack(
         alignment: Alignment.center,
         children: <Widget>[
           CachedNetworkImage(
             imageUrl: lowResImageUrl,
-            width: size,
-            height: size,
+            width: width,
+            height: height,
             fit: BoxFit.cover,
             memCacheWidth: 256,
-            memCacheHeight: 256,
             imageBuilder: (context, imageProvider) => ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: Stack(
                 children: [
                   Image(
                     image: imageProvider,
-                    fit: isImageSmall ? BoxFit.fill : BoxFit.cover,
-                    width: size,
-                    height: size,
-                    centerSlice: isImageSmall
-                        ? const Rect.fromLTRB(1, 1, 1, 1)
-                        : null,
+                    fit: BoxFit.cover,
+                    width: width,
+                    height: height,
                   ),
                   if (isOffline)
                     Positioned(
@@ -882,28 +885,26 @@ class _OnlineArtwork extends StatelessWidget {
                 ],
               ),
             ),
-            errorWidget: (context, url, error) =>
-                NullArtworkWidget(iconSize: 30, size: size),
+            errorWidget: (context, url, error) => SizedBox(
+              width: width,
+              height: height,
+              child: NullArtworkWidget(iconSize: 24, size: height),
+            ),
           ),
           if (isDurationAvailable && !isOffline)
             Positioned(
-              bottom: 4,
-              right: 4,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.85,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  formatDuration(duration),
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 11,
-                  ),
+              bottom: 3,
+              right: 5,
+              child: Text(
+                formatDuration(duration),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 10.5,
+                  shadows: [
+                    Shadow(color: Colors.black, blurRadius: 4),
+                    Shadow(color: Colors.black87, blurRadius: 8),
+                  ],
                 ),
               ),
             ),
@@ -917,7 +918,8 @@ class _ArtworkDisplay extends StatelessWidget {
   const _ArtworkDisplay({
     required this.lowResImageUrl,
     required this.artworkPath,
-    required this.size,
+    required this.width,
+    required this.height,
     required this.isDurationAvailable,
     required this.colorScheme,
     required this.offlineStatus,
@@ -927,7 +929,8 @@ class _ArtworkDisplay extends StatelessWidget {
 
   final String lowResImageUrl;
   final String? artworkPath;
-  final double size;
+  final double width;
+  final double height;
   final bool isDurationAvailable;
   final ColorScheme colorScheme;
   final ValueListenable<bool> offlineStatus;
@@ -942,7 +945,8 @@ class _ArtworkDisplay extends StatelessWidget {
         if (isOffline && artworkPath != null) {
           return _OfflineArtwork(
             artworkPath: artworkPath!,
-            size: size,
+            width: width,
+            height: height,
             colorScheme: colorScheme,
           );
         }
@@ -952,7 +956,8 @@ class _ArtworkDisplay extends StatelessWidget {
           builder: (_, isLiked, __) {
             return _OnlineArtwork(
               lowResImageUrl: lowResImageUrl,
-              size: size,
+              width: width,
+              height: height,
               isDurationAvailable: isDurationAvailable,
               colorScheme: colorScheme,
               duration: duration,

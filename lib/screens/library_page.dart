@@ -125,9 +125,7 @@ class _LibraryPageState extends State<LibraryPage> {
                         _buildSubHeader(context),
                         const SizedBox(height: 24),
                         _buildBanner(context),
-                        const SizedBox(height: 24),
-                        _buildActionGroup(context),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
                       ],
                     ),
                   ),
@@ -137,6 +135,12 @@ class _LibraryPageState extends State<LibraryPage> {
                 if (!offlineMode.value)
                   ..._buildLikedPlaylistsSlivers(),
                 ..._buildLikedArtistsSlivers(),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 24.0),
+                    child: _buildActionGroup(context),
+                  ),
+                ),
                 const SliverMiniPlayerBottomSpace(),
               ],
             );
@@ -154,7 +158,7 @@ class _LibraryPageState extends State<LibraryPage> {
       children: [
         Row(
           children: [
-            const Icon(FluentIcons.library_24_filled, color: Color(0xFFA67CFF), size: 28),
+            const Icon(FluentIcons.library_24_filled, color: Color(0xFFE11D48), size: 28),
             const SizedBox(width: 8),
             Text(
               'My Library',
@@ -191,7 +195,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 width: 44,
                 height: 44,
                 decoration: const BoxDecoration(
-                  color: Color(0xFF8B5CF6),
+                  color: Color(0xFFE11D48),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -214,7 +218,7 @@ class _LibraryPageState extends State<LibraryPage> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: const LinearGradient(
-          colors: [Color(0xFF1A1A2E), Color(0xFF16213E)],
+          colors: [Color(0xFF2B0F18), Color(0xFF1A0B10)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -240,7 +244,7 @@ class _LibraryPageState extends State<LibraryPage> {
               child: Icon(
                 FluentIcons.headphones_24_filled,
                 size: 64,
-                color: const Color(0xFFA67CFF).withValues(alpha: 0.8),
+                color: const Color(0xFFE11D48).withValues(alpha: 0.85),
               ),
             ),
           )
@@ -250,41 +254,35 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Widget _buildActionGroup(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        children: [
-          _buildActionTile(
-            title: 'Recently played',
-            listNotifier: userRecentlyPlayed,
-            icon: FluentIcons.history_24_regular,
-            iconColor: const Color(0xFFA67CFF),
-            backgroundColor: const Color(0xFF2C2442),
-            onTap: () => NavigationManager.router.go('/library/userSongs/recents'),
-          ),
-          Divider(color: Colors.white.withValues(alpha: 0.05), height: 1, indent: 72, endIndent: 16),
-          _buildActionTile(
-            title: 'Liked songs',
-            listNotifier: userLikedSongsList,
-            icon: FluentIcons.heart_24_regular,
-            iconColor: const Color(0xFFFF71A9),
-            backgroundColor: const Color(0xFF421C2F),
-            onTap: () => NavigationManager.router.go('/library/userSongs/liked'),
-          ),
-          Divider(color: Colors.white.withValues(alpha: 0.05), height: 1, indent: 72, endIndent: 16),
-          _buildActionTile(
-            title: 'Offline songs',
-            listNotifier: userOfflineSongs,
-            icon: FluentIcons.cloud_off_24_regular,
-            iconColor: const Color(0xFF00E5FF),
-            backgroundColor: const Color(0xFF123440),
-            onTap: () => NavigationManager.router.go('/library/userSongs/offline'),
-          ),
-        ],
-      ),
+    return Column(
+      children: [
+        _buildActionTile(
+          title: 'Recently played',
+          listNotifier: userRecentlyPlayed,
+          icon: FluentIcons.history_24_regular,
+          iconColor: const Color(0xFFA67CFF),
+          backgroundColor: const Color(0xFF2C2442),
+          onTap: () => NavigationManager.router.go('/library/userSongs/recents'),
+        ),
+        Divider(color: Colors.white.withValues(alpha: 0.05), height: 1, indent: 72, endIndent: 16),
+        _buildActionTile(
+          title: 'Liked songs',
+          listNotifier: userLikedSongsList,
+          icon: FluentIcons.heart_24_regular,
+          iconColor: const Color(0xFFFF71A9),
+          backgroundColor: const Color(0xFF421C2F),
+          onTap: () => NavigationManager.router.go('/library/userSongs/liked'),
+        ),
+        Divider(color: Colors.white.withValues(alpha: 0.05), height: 1, indent: 72, endIndent: 16),
+        _buildActionTile(
+          title: 'Offline songs',
+          listNotifier: userOfflineSongs,
+          icon: FluentIcons.cloud_off_24_regular,
+          iconColor: const Color(0xFF00E5FF),
+          backgroundColor: const Color(0xFF123440),
+          onTap: () => NavigationManager.router.go('/library/userSongs/offline'),
+        ),
+      ],
     );
   }
 
@@ -511,48 +509,62 @@ class _LibraryPageState extends State<LibraryPage> {
     ];
   }
 
+  static const _playlistGridDelegate =
+      SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 14,
+        childAspectRatio: 0.80,
+      );
+
+  Widget _buildPlaylistCardItem(
+    dynamic playlist,
+    int index, {
+    bool isOfflinePlaylists = false,
+  }) {
+    final isArtist = playlist['source']?.toString() == 'youtube-artist';
+    return PlaylistBar(
+      key: listItemKey('library_playlist', index, playlist),
+      playlist['title'],
+      playlistId: playlist['ytid'],
+      playlistArtwork: playlist['image'],
+      cubeIcon: isArtist
+          ? FluentIcons.person_24_filled
+          : FluentIcons.text_bullet_list_24_filled,
+      isAlbum: isArtist ? false : playlist['isAlbum'],
+      isCard: true,
+      playlistData:
+          isArtist ||
+                  playlist['source'] == 'user-created' ||
+                  playlist['source'] == 'user-youtube' ||
+                  isOfflinePlaylists
+              ? playlist
+              : null,
+      onDelete:
+          playlist['source'] == 'user-created' ||
+                  playlist['source'] == 'user-youtube' ||
+                  isOfflinePlaylists
+              ? () => isOfflinePlaylists
+                    ? _showRemoveOfflinePlaylistDialog(playlist)
+                    : _showRemovePlaylistDialog(playlist)
+              : null,
+    );
+  }
+
   Widget _buildSliverPlaylistList(
     List playlists, {
     bool isOfflinePlaylists = false,
   }) {
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      sliver: SliverList.builder(
+      padding: const EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 12.0),
+      sliver: SliverGrid.builder(
+        gridDelegate: _playlistGridDelegate,
         itemCount: playlists.length,
-        itemBuilder: (BuildContext context, index) {
-          final playlist = playlists[index];
-          final isArtist = playlist['source']?.toString() == 'youtube-artist';
-          final borderRadius = getItemBorderRadius(
-            index,
-            playlists.length,
-          );
-          return PlaylistBar(
-            key: listItemKey('library_playlist', index, playlist),
-            playlist['title'],
-            playlistId: playlist['ytid'],
-            playlistArtwork: playlist['image'],
-            cubeIcon: isArtist
-                ? FluentIcons.person_24_filled
-                : FluentIcons.text_bullet_list_24_filled,
-            isAlbum: isArtist ? false : playlist['isAlbum'],
-            playlistData:
-                isArtist ||
-                    playlist['source'] == 'user-created' ||
-                    playlist['source'] == 'user-youtube' ||
-                    isOfflinePlaylists
-                ? playlist
-                : null,
-            onDelete:
-                playlist['source'] == 'user-created' ||
-                    playlist['source'] == 'user-youtube' ||
-                    isOfflinePlaylists
-                ? () => isOfflinePlaylists
-                      ? _showRemoveOfflinePlaylistDialog(playlist)
-                      : _showRemovePlaylistDialog(playlist)
-                : null,
-            borderRadius: borderRadius,
-          );
-        },
+        itemBuilder: (BuildContext context, index) => _buildPlaylistCardItem(
+          playlists[index],
+          index,
+          isOfflinePlaylists: isOfflinePlaylists,
+        ),
       ),
     );
   }
@@ -581,40 +593,17 @@ class _LibraryPageState extends State<LibraryPage> {
     List playlists, {
     bool isOfflinePlaylists = false,
   }) {
-    return ListView.builder(
+    return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: _playlistGridDelegate,
       itemCount: playlists.length,
-      padding: EdgeInsets.zero,
-      itemBuilder: (BuildContext context, index) {
-        final playlist = playlists[index];
-        final borderRadius = getItemBorderRadius(
-          index,
-          playlists.length,
-        );
-        return PlaylistBar(
-          key: listItemKey('library_playlist', index, playlist),
-          playlist['title'],
-          playlistId: playlist['ytid'],
-          playlistArtwork: playlist['image'],
-          isAlbum: playlist['isAlbum'],
-          playlistData:
-              playlist['source'] == 'user-created' ||
-                  playlist['source'] == 'user-youtube' ||
-                  isOfflinePlaylists
-              ? playlist
-              : null,
-          onDelete:
-              playlist['source'] == 'user-created' ||
-                  playlist['source'] == 'user-youtube' ||
-                  isOfflinePlaylists
-              ? () => isOfflinePlaylists
-                    ? _showRemoveOfflinePlaylistDialog(playlist)
-                    : _showRemovePlaylistDialog(playlist)
-              : null,
-          borderRadius: borderRadius,
-        );
-      },
+      padding: const EdgeInsets.only(top: 4.0, bottom: 12.0),
+      itemBuilder: (BuildContext context, index) => _buildPlaylistCardItem(
+        playlists[index],
+        index,
+        isOfflinePlaylists: isOfflinePlaylists,
+      ),
     );
   }
 

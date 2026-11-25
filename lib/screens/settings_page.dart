@@ -15,6 +15,8 @@ import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/services/update_manager.dart';
+import 'package:musify/services/auth_service.dart';
+import 'package:musify/services/sync_service.dart';
 import 'package:musify/theme/app_colors.dart';
 import 'package:musify/theme/app_themes.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart';
@@ -22,8 +24,8 @@ import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/bottom_sheet_bar.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
-import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/settings_components.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -37,9 +39,10 @@ class SettingsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n!.settings)),
       body: SingleChildScrollView(
-        padding: commonSingleChildScrollViewPadding,
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
         child: Column(
           children: <Widget>[
+            _buildAccountSection(context),
             _buildPreferencesSection(
               context,
               primaryColor,
@@ -53,6 +56,38 @@ class SettingsPage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAccountSection(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final authService = AuthService.instance;
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: authService.isLoggedIn,
+      builder: (context, loggedIn, _) {
+        return ValueListenableBuilder<User?>(
+          valueListenable: authService.currentUser,
+          builder: (context, user, _) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: SettingsCardGroup(
+                title: 'Account',
+                icon: FluentIcons.person_24_filled,
+                children: [
+                  if (!loggedIn)
+                    _AccountSignInTile(colorScheme: colorScheme)
+                  else
+                    _AccountInfoTile(
+                      user: user,
+                      colorScheme: colorScheme,
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -279,12 +314,10 @@ class SettingsPage extends StatelessWidget {
   }
 
   Widget _buildToolsSection(BuildContext context) {
-    return Column(
+    return SettingsCardGroup(
+      title: context.l10n!.tools,
+      icon: FluentIcons.toolbox_24_filled,
       children: [
-        SectionHeader(
-          title: context.l10n!.tools,
-          icon: FluentIcons.toolbox_24_filled,
-        ),
         ModernSettingsTile(
           title: context.l10n!.clearCache,
           icon: FluentIcons.broom_24_regular,
@@ -417,12 +450,10 @@ class SettingsPage extends StatelessWidget {
   }
 
   Widget _buildOthersSection(BuildContext context) {
-    return Column(
+    return SettingsCardGroup(
+      title: context.l10n!.others,
+      icon: FluentIcons.more_circle_24_filled,
       children: [
-        SectionHeader(
-          title: context.l10n!.others,
-          icon: FluentIcons.more_circle_24_filled,
-        ),
         ModernSettingsTile(
           title: '${context.l10n!.copyLogs} (${logger.getLogCount()})',
           icon: FluentIcons.error_circle_24_regular,
@@ -744,7 +775,7 @@ class SettingsPage extends StatelessWidget {
           return AlertDialog(
             icon: Icon(
               FluentIcons.info_24_regular,
-              color: colorScheme.primary,
+              color: colorScheme.onSurface,
               size: 32,
             ),
             content: Text(
@@ -780,5 +811,469 @@ class SettingsPage extends StatelessWidget {
         );
       }
     }
+  }
+}
+
+class _AccountSignInTile extends StatefulWidget {
+  const _AccountSignInTile({required this.colorScheme});
+  final ColorScheme colorScheme;
+
+  @override
+  State<_AccountSignInTile> createState() => _AccountSignInTileState();
+}
+
+class _AccountSignInTileState extends State<_AccountSignInTile> {
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _otpController = TextEditingController();
+  bool _isOtpSent = false;
+  bool _loading = false;
+  String? _verificationId;
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _otpController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handlePostSignIn() async {
+    if (!mounted) return;
+    try {
+      final hasCloud = await SyncService.instance.hasCloudData();
+      if (hasCloud) {
+        if (mounted) {
+          final shouldRestore = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              icon: Icon(
+                FluentIcons.cloud_sync_24_regular,
+                color: widget.colorScheme.onSurface,
+                size: 32,
+              ),
+              title: const Text('Cloud Data Found'),
+              content: const Text(
+                'Your previously synced data was found. '
+                'Restore liked songs, playlists & history?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Skip'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Restore'),
+                ),
+              ],
+            ),
+          );
+
+          if (shouldRestore == true) {
+            final success = await SyncService.instance.restoreFromCloud();
+            if (mounted) {
+              showToast(
+                context,
+                success ? 'Data restored successfully ✓' : 'Restore failed',
+                icon: success ? null : FluentIcons.error_circle_24_regular,
+              );
+            }
+          } else {
+            await SyncService.instance.uploadAll();
+          }
+        }
+      } else {
+        await SyncService.instance.uploadAll();
+        if (mounted) {
+          showToast(context, 'Data synced to cloud ✓');
+        }
+      }
+    } catch (e) {
+      if (mounted) showToast(context, 'Sync error: $e');
+    }
+  }
+
+  void _sendOtp() {
+    final rawPhone = _phoneController.text.trim();
+    final cleanPhone = rawPhone.replaceAll(RegExp(r'\D'), '');
+    if (cleanPhone.length < 10) {
+      showToast(context, 'Please enter a valid 10-digit mobile number');
+      return;
+    }
+
+    setState(() {
+      _isOtpSent = true;
+    });
+    showToast(context, 'OTP Sent! (Testing OTP: 0000)');
+
+    // Also trigger Firebase Phone Auth in background
+    AuthService.instance.sendPhoneOtp(
+      phoneNumber: rawPhone,
+      onCodeSent: (verId) {
+        if (mounted) setState(() => _verificationId = verId);
+      },
+      onError: (_) {},
+    );
+  }
+
+  Future<void> _verifyOtp() async {
+    final otp = _otpController.text.trim();
+    if (otp.isEmpty) {
+      showToast(context, 'Please enter OTP (use 0000)');
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      final success = await AuthService.instance.signInWithPhone(
+        phoneNumber: _phoneController.text.trim(),
+        otp: otp,
+        verificationId: _verificationId,
+      );
+      if (success) {
+        await _handlePostSignIn();
+      } else {
+        if (mounted) {
+          showToast(
+            context,
+            'Invalid OTP or verification failed',
+            icon: FluentIcons.error_circle_24_regular,
+          );
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _loading = true);
+    try {
+      final user = await AuthService.instance.signInWithGoogle();
+      if (user != null) {
+        await _handlePostSignIn();
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                FluentIcons.phone_24_regular,
+                size: 28,
+                color: widget.colorScheme.onSurface,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sign in with Mobile Number',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: widget.colorScheme.onSurface,
+                      ),
+                    ),
+                    Text(
+                      'Sync your liked songs & playlists to your number',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: widget.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          if (!_isOtpSent) ...[
+            // Mobile Number Input
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                prefixIcon: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  child: Text(
+                    '+91',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: widget.colorScheme.onSurface,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                hintText: 'Enter 10-digit mobile number',
+                filled: true,
+                fillColor: widget.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              onPressed: _loading ? null : _sendOtp,
+              icon: const Icon(FluentIcons.send_24_regular, size: 18),
+              label: const Text('Send OTP'),
+            ),
+          ] else ...[
+            // OTP Input
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Code sent to +91 ${_phoneController.text.trim()}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: widget.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _isOtpSent = false;
+                      _otpController.clear();
+                    });
+                  },
+                  child: const Text('Change'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _otpController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(FluentIcons.password_24_regular),
+                hintText: 'Enter OTP (Testing OTP: 0000)',
+                filled: true,
+                fillColor: widget.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              onPressed: _loading ? null : _verifyOtp,
+              icon: _loading
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: widget.colorScheme.onPrimary,
+                      ),
+                    )
+                  : const Icon(FluentIcons.checkmark_24_regular, size: 18),
+              label: Text(_loading ? 'Verifying...' : 'Verify & Sign In'),
+            ),
+          ],
+
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: Divider(color: widget.colorScheme.outlineVariant)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'OR',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: widget.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Expanded(child: Divider(color: widget.colorScheme.outlineVariant)),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Google Sign-In as secondary option
+          OutlinedButton.icon(
+            onPressed: _loading ? null : _handleGoogleSignIn,
+            icon: const Icon(FluentIcons.person_add_24_regular, size: 18),
+            label: const Text('Sign in with Google'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountInfoTile extends StatefulWidget {
+  const _AccountInfoTile({required this.user, required this.colorScheme});
+  final User? user;
+  final ColorScheme colorScheme;
+
+  @override
+  State<_AccountInfoTile> createState() => _AccountInfoTileState();
+}
+
+class _AccountInfoTileState extends State<_AccountInfoTile> {
+  bool _syncing = false;
+
+  Future<void> _syncNow() async {
+    setState(() => _syncing = true);
+    try {
+      await SyncService.instance.uploadAll();
+      if (mounted) showToast(context, 'Synced ✓');
+    } catch (_) {
+      if (mounted) {
+        showToast(
+          context,
+          'Sync failed',
+          icon: FluentIcons.error_circle_24_regular,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _syncing = false);
+    }
+  }
+
+  Future<void> _signOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => ConfirmationDialog(
+        submitMessage: 'Sign Out',
+        confirmationMessage: 'Are you sure you want to sign out?',
+        onCancel: () => Navigator.pop(ctx, false),
+        onSubmit: () => Navigator.pop(ctx, true),
+      ),
+    );
+
+    if (confirmed == true) {
+      await AuthService.instance.signOut();
+      if (mounted) showToast(context, 'Signed out');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final email = widget.user?.email ?? '';
+    final photoUrl = widget.user?.photoURL;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: widget.colorScheme.surfaceContainerHighest,
+                backgroundImage:
+                    photoUrl != null ? NetworkImage(photoUrl) : null,
+                child: photoUrl == null
+                    ? Icon(
+                        FluentIcons.person_24_filled,
+                        color: widget.colorScheme.onSurfaceVariant,
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.user?.displayName ?? 'Signed In',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: widget.colorScheme.onSurface,
+                      ),
+                    ),
+                    if (email.isNotEmpty && !email.endsWith('@nitmusic.app'))
+                      Text(
+                        email,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: widget.colorScheme.onSurfaceVariant,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      )
+                    else if (email.endsWith('@nitmusic.app'))
+                      Text(
+                        'Phone Verified ✓',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: widget.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Icon(
+                FluentIcons.cloud_checkmark_24_regular,
+                color: const Color(0xFFE11D48),
+                size: 20,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _syncing ? null : _syncNow,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: widget.colorScheme.onSurface,
+                    side: BorderSide(color: widget.colorScheme.outlineVariant),
+                  ),
+                  icon: _syncing
+                      ? SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: widget.colorScheme.onSurface,
+                          ),
+                        )
+                      : const Icon(
+                          FluentIcons.arrow_sync_24_regular,
+                          size: 16,
+                          color: Color(0xFFE11D48),
+                        ),
+                  label: Text(_syncing ? 'Syncing...' : 'Sync Now'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _signOut,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: widget.colorScheme.onSurface,
+                    side: BorderSide(color: widget.colorScheme.outlineVariant),
+                  ),
+                  icon: const Icon(FluentIcons.sign_out_24_regular, size: 16),
+                  label: const Text('Sign Out'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

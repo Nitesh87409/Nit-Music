@@ -34,10 +34,10 @@ class MiniPlayer extends StatelessWidget {
 
   const MiniPlayer({this.onTap, super.key});
 
-  static const double playerHeight = 72;
-  static const double _borderRadius = 16;
-  static const double _artworkSize = 52;
-  static const double _artworkRadius = 14;
+  static const double playerHeight = 58;
+  static const double _borderRadius = 13;
+  static const double _artworkSize = 42;
+  static const double _artworkRadius = 10;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +53,15 @@ class MiniPlayer extends StatelessWidget {
           if (metadata == null) return const SizedBox.shrink();
 
           return StreamBuilder<FullPlayerState>(
+            initialData: FullPlayerState(
+              playbackState: audioHandler.playbackState.value,
+              queue: audioHandler.queue.value,
+              position: PositionData(
+                audioHandler.playbackState.value.updatePosition,
+                audioHandler.playbackState.value.bufferedPosition,
+                metadata.duration ?? Duration.zero,
+              ),
+            ),
             stream: _fullPlayerStateStream,
             builder: (context, stateSnapshot) {
               final state = stateSnapshot.data;
@@ -117,7 +126,7 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
     _scaleAnimation = Tween<double>(begin: 1, end: 0.98).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-    _updatePaletteIfNeeded();
+    _syncPaletteFromCacheOrFetch();
   }
 
   Color? _dominantColor;
@@ -129,13 +138,25 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
   void didUpdateWidget(covariant _MiniPlayerBody oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.metadata.id != oldWidget.metadata.id) {
-      _updatePaletteIfNeeded();
+      _syncPaletteFromCacheOrFetch();
       _isDismissed = false;
       _slideOffset = Offset.zero;
     }
     if (widget.state.playbackState.playing && !oldWidget.state.playbackState.playing) {
       _isDismissed = false;
       _slideOffset = Offset.zero;
+    }
+  }
+
+  void _syncPaletteFromCacheOrFetch() {
+    final item = widget.metadata;
+    if (PaletteCache.hasColorsFor(item.id)) {
+      _dominantColor = PaletteCache.dominantColor;
+      _vibrantColor = PaletteCache.vibrantColor;
+    } else {
+      _dominantColor = null;
+      _vibrantColor = null;
+      _updatePaletteIfNeeded();
     }
   }
 
@@ -219,14 +240,16 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
     final metadata = widget.metadata;
     final state = widget.state;
 
-    final backgroundColor = _vibrantColor ?? _dominantColor ?? defaultColorScheme.surfaceContainerHighest;
-    final isDark = ThemeData.estimateBrightnessForColor(backgroundColor) == Brightness.dark;
-    
+    final backgroundColor =
+        _vibrantColor ?? _dominantColor ?? const Color(0xFF1E1418);
+    final isDark =
+        ThemeData.estimateBrightnessForColor(backgroundColor) == Brightness.dark;
+
     final colorScheme = defaultColorScheme.copyWith(
-      secondary: Colors.white,
-      onSurfaceVariant: Colors.white70,
-      onSurface: Colors.white,
-      primary: _vibrantColor ?? _dominantColor ?? defaultColorScheme.primary,
+      secondary: isDark ? Colors.white : Colors.black,
+      onSurfaceVariant: isDark ? Colors.white70 : Colors.black87,
+      onSurface: isDark ? Colors.white : Colors.black,
+      primary: _vibrantColor ?? _dominantColor ?? const Color(0xFFE11D48),
     );
 
     final totalDuration = state.position.duration > Duration.zero
@@ -345,7 +368,9 @@ class _ArtworkWidget extends StatelessWidget {
             child: SongArtworkWidget(
               metadata: metadata,
               size: MiniPlayer._artworkSize,
-              errorWidgetIconSize: 24,
+              width: 72,
+              height: 40,
+              errorWidgetIconSize: 20,
               borderRadius: MiniPlayer._artworkRadius,
             ),
           ),
@@ -395,7 +420,7 @@ class _MetadataAndProgressWidget extends StatelessWidget {
               title,
               style: TextStyle(
                 color: colorScheme.secondary,
-                fontSize: 15,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.1,
               ),
@@ -404,31 +429,31 @@ class _MetadataAndProgressWidget extends StatelessWidget {
             ),
           ),
           if (artist != null && artist!.isNotEmpty) ...[
-            const SizedBox(height: 2),
+            const SizedBox(height: 1),
             Text(
               artist!,
               style: TextStyle(
                 color: colorScheme.onSurfaceVariant,
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w400,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ],
-          const SizedBox(height: 6),
+          const SizedBox(height: 3),
           Row(
             children: [
               Text(
                 _formatDuration(position),
-                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 10),
+                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 9),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
               Expanded(
                 child: SizedBox(
-                  height: 3,
+                  height: 2.5,
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(1.5),
+                    borderRadius: BorderRadius.circular(1.25),
                     child: LinearProgressIndicator(
                       value: progress,
                       backgroundColor: Colors.white24,
@@ -437,10 +462,10 @@ class _MetadataAndProgressWidget extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
               Text(
                 _formatDuration(duration),
-                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 10),
+                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 9),
               ),
             ],
           ),
@@ -474,9 +499,9 @@ class _ControlsWidget extends StatelessWidget {
           colorScheme: colorScheme,
           playbackState: playbackState,
         ),
-        const SizedBox(width: 12),
-        Container(width: 1, height: 24, color: Colors.white24),
-        const SizedBox(width: 4),
+        const SizedBox(width: 8),
+        Container(width: 1, height: 16, color: Colors.white24),
+        const SizedBox(width: 2),
         IconButton(
           onPressed: audioHandler.skipToNext,
           splashColor: Colors.transparent,
@@ -484,7 +509,7 @@ class _ControlsWidget extends StatelessWidget {
           icon: Icon(
             FluentIcons.next_24_filled,
             color: colorScheme.secondary,
-            size: 24,
+            size: 20,
           ),
           visualDensity: VisualDensity.compact,
         ),
@@ -512,30 +537,30 @@ class _CircularPlayButton extends StatelessWidget {
     final isCompleted = processingState == AudioProcessingState.completed;
 
     return SizedBox(
-      width: 48,
-      height: 48,
+      width: 38,
+      height: 38,
       child: Stack(
         alignment: Alignment.center,
         children: [
           CustomPaint(
-            size: const Size(48, 48),
+            size: const Size(38, 38),
             painter: _DashedCirclePainter(
               color: Colors.white30,
             ),
           ),
           if (isLoading)
             SizedBox(
-              width: 24,
-              height: 24,
+              width: 20,
+              height: 20,
               child: CircularProgressIndicator(
-                strokeWidth: 2.5,
+                strokeWidth: 2.0,
                 valueColor: AlwaysStoppedAnimation<Color>(colorScheme.secondary),
               ),
             )
           else
             Container(
-              width: 36,
-              height: 36,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
@@ -557,7 +582,7 @@ class _CircularPlayButton extends StatelessWidget {
                             ? FluentIcons.pause_16_filled
                             : FluentIcons.play_16_filled),
                   color: Colors.white,
-                  size: 16,
+                  size: 14,
                 ),
                 padding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,

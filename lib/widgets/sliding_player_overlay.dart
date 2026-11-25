@@ -83,7 +83,7 @@ class _SlidingPlayerOverlayState extends State<SlidingPlayerOverlay> {
                     Positioned(
                       left: 8.0,
                       right: 8.0,
-                      bottom: widget.bottomMargin + 8.0, // A slight margin
+                      bottom: widget.bottomMargin + 1.5, // 1-2px above nav bar
                       child: Opacity(
                         opacity: (1.0 - (progress * 2)).clamp(0.0, 1.0),
                         child: MiniPlayer(

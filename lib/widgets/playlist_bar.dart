@@ -31,6 +31,7 @@ class PlaylistBar extends StatelessWidget {
     this.cubeIcon = FluentIcons.text_bullet_list_24_filled,
     this.showBuildActions = true,
     this.isAlbum = false,
+    this.isCard = false,
     this.borderRadius = BorderRadius.zero,
   });
 
@@ -43,6 +44,7 @@ class PlaylistBar extends StatelessWidget {
   final IconData cubeIcon;
   final bool? isAlbum;
   final bool showBuildActions;
+  final bool isCard;
   final BorderRadius borderRadius;
 
   static const double artworkSize = 60;
@@ -74,8 +76,45 @@ class PlaylistBar extends StatelessWidget {
         ? normalizeArtistDisplayTitle(playlistTitle)
         : playlistTitle;
     Map<dynamic, dynamic>? updatedPlaylist;
+    if (isCard) {
+      return Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed ?? _getDefaultOnPressed(context, updatedPlaylist),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildCardArtwork(colorScheme)),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  if (!isFolder && _resolvedPlaylistId != null)
+                    _buildPinBadge(colorScheme),
+                  Expanded(
+                    child: Text(
+                      displayTitle,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: colorScheme.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (showBuildActions)
+                    _buildOverflowMenu(context, colorScheme),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return Material(
-      color: colorScheme.surfaceContainerLow,
+      color: Colors.transparent,
       borderRadius: borderRadius,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -97,22 +136,7 @@ class PlaylistBar extends StatelessWidget {
                     Row(
                       children: [
                         if (!isFolder && _resolvedPlaylistId != null)
-                          ValueListenableBuilder<List<String>>(
-                            valueListenable: pinnedPlaylistIds,
-                            builder: (_, ids, __) {
-                              if (!ids.contains(_resolvedPlaylistId)) {
-                                return const SizedBox.shrink();
-                              }
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: Icon(
-                                  FluentIcons.pin_24_filled,
-                                  size: 13,
-                                  color: colorScheme.primary,
-                                ),
-                              );
-                            },
-                          ),
+                          _buildPinBadge(colorScheme),
                         Expanded(
                           child: Text(
                             displayTitle,
@@ -135,221 +159,7 @@ class PlaylistBar extends StatelessWidget {
               ),
               if (showBuildActions) ...[
                 const SizedBox(width: 4),
-                OverflowMenuButton<String>(
-                  onSelected: (String value) {
-                    switch (value) {
-                      case 'like':
-                        if (_resolvedPlaylistId != null) {
-                          final isLiked = isPlaylistAlreadyLiked(
-                            _resolvedPlaylistId,
-                          );
-                          unawaited(
-                            updatePlaylistLikeStatus(
-                              _resolvedPlaylistId!,
-                              !isLiked,
-                              playlistData: playlistData,
-                            ),
-                          );
-                        }
-                        break;
-                      case 'pin':
-                        if (_resolvedPlaylistId != null) {
-                          final pinned = togglePinnedPlaylist(
-                            _resolvedPlaylistId!,
-                            context,
-                          );
-                          if (!pinned &&
-                              !isPlaylistPinned(_resolvedPlaylistId!) &&
-                              pinnedPlaylistIds.value.length >=
-                                  pinnedPlaylistsLimit) {
-                            showToast(
-                              context,
-                              context.l10n!.pinnedPlaylistsLimit,
-                            );
-                          }
-                        }
-                        break;
-                      case 'delete':
-                        if (onDelete != null) onDelete!();
-                        break;
-                      case 'moveToFolder':
-                        _showMoveToFolderDialog(context);
-                        break;
-                      case 'edit':
-                        if (isFolder) {
-                          _handleEditFolder(context);
-                        } else {
-                          _handleEdit(context);
-                        }
-                        break;
-                      case 'add_to_playlist':
-                        _handleAddPlaylistToPlaylist(context);
-                        break;
-                      case 'remove_offline':
-                        if (playlistData != null &&
-                            playlistData!['ytid'] != null) {
-                          showRemoveOfflinePlaylistDialog(
-                            context,
-                            playlistData!['ytid'].toString(),
-                          );
-                        }
-                        break;
-                    }
-                  },
-                  itemBuilder: (BuildContext context) {
-                    final isUserCreated =
-                        playlistData?['source'] == 'user-created';
-                    final pinnedIds = pinnedPlaylistIds.value;
-
-                    final isPinned =
-                        _resolvedPlaylistId != null &&
-                        pinnedIds.contains(_resolvedPlaylistId);
-
-                    final isLiked =
-                        _resolvedPlaylistId != null &&
-                        isPlaylistAlreadyLiked(_resolvedPlaylistId);
-
-                    final isOffline =
-                        playlistData != null &&
-                        (playlistData!['downloadedAt'] != null ||
-                            playlistData!['isOffline'] == true);
-
-                    return [
-                      if (!isFolder && _resolvedPlaylistId != null)
-                        PopupMenuItem<String>(
-                          value: 'pin',
-                          child: Row(
-                            children: [
-                              Icon(
-                                isPinned
-                                    ? FluentIcons.pin_off_24_regular
-                                    : FluentIcons.pin_24_regular,
-                                color: colorScheme.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                isPinned
-                                    ? context.l10n!.unpinFromLibrary
-                                    : context.l10n!.pinToLibrary,
-                              ),
-                            ],
-                          ),
-                        ),
-
-                      if (!isFolder && (onDelete == null || !isUserCreated))
-                        PopupMenuItem<String>(
-                          value: 'like',
-                          child: Row(
-                            children: [
-                              Icon(
-                                likeStatusToIconMapper[isLiked],
-                                color: colorScheme.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                isLiked
-                                    ? context.l10n!.removeFromLikedPlaylists
-                                    : context.l10n!.addToLikedPlaylists,
-                              ),
-                            ],
-                          ),
-                        ),
-
-                      if (_canAddToPlaylist)
-                        PopupMenuItem<String>(
-                          value: 'add_to_playlist',
-                          child: Row(
-                            children: [
-                              Icon(
-                                FluentIcons.album_add_24_regular,
-                                color: colorScheme.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(context.l10n!.addToPlaylist),
-                            ],
-                          ),
-                        ),
-
-                      if (isOffline)
-                        PopupMenuItem<String>(
-                          value: 'remove_offline',
-                          child: Row(
-                            children: [
-                              Icon(
-                                FluentIcons.cloud_off_24_regular,
-                                color: colorScheme.error,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(context.l10n!.removeOffline),
-                            ],
-                          ),
-                        ),
-
-                      if (playlistData != null &&
-                          !isFolder &&
-                          (playlistData!['source'] == 'user-created' ||
-                              playlistData!['source'] == 'user-youtube'))
-                        PopupMenuItem<String>(
-                          value: 'moveToFolder',
-                          child: Row(
-                            children: [
-                              Icon(
-                                FluentIcons.folder_24_regular,
-                                color: colorScheme.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(context.l10n!.moveToFolder),
-                            ],
-                          ),
-                        ),
-
-                      if (playlistData != null &&
-                          (isFolder ||
-                              playlistData!['source'] == 'user-created'))
-                        PopupMenuItem<String>(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(
-                                FluentIcons.edit_24_regular,
-                                color: colorScheme.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                isFolder
-                                    ? context.l10n!.editFolder
-                                    : context.l10n!.editPlaylist,
-                              ),
-                            ],
-                          ),
-                        ),
-
-                      if (onDelete != null)
-                        PopupMenuItem<String>(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(
-                                FluentIcons.delete_24_regular,
-                                color: isFolder
-                                    ? colorScheme.error
-                                    : colorScheme.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                isFolder
-                                    ? context.l10n!.deleteFolder
-                                    : context.l10n!.deletePlaylist,
-                                style: isFolder
-                                    ? TextStyle(color: colorScheme.error)
-                                    : null,
-                              ),
-                            ],
-                          ),
-                        ),
-                    ];
-                  },
-                ),
+                _buildOverflowMenu(context, colorScheme),
               ],
             ],
           ),
@@ -358,17 +168,270 @@ class PlaylistBar extends StatelessWidget {
     );
   }
 
+  Widget _buildPinBadge(ColorScheme colorScheme) {
+    return ValueListenableBuilder<List<String>>(
+      valueListenable: pinnedPlaylistIds,
+      builder: (_, ids, __) {
+        if (!ids.contains(_resolvedPlaylistId)) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: Icon(
+            FluentIcons.pin_24_filled,
+            size: 13,
+            color: colorScheme.primary,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildOverflowMenu(BuildContext context, ColorScheme colorScheme) {
+    return OverflowMenuButton<String>(
+      onSelected: (String value) {
+        switch (value) {
+          case 'like':
+            if (_resolvedPlaylistId != null) {
+              final isLiked = isPlaylistAlreadyLiked(_resolvedPlaylistId);
+              unawaited(
+                updatePlaylistLikeStatus(
+                  _resolvedPlaylistId!,
+                  !isLiked,
+                  playlistData: playlistData,
+                ),
+              );
+            }
+            break;
+          case 'pin':
+            if (_resolvedPlaylistId != null) {
+              final pinned = togglePinnedPlaylist(_resolvedPlaylistId!, context);
+              if (!pinned &&
+                  !isPlaylistPinned(_resolvedPlaylistId!) &&
+                  pinnedPlaylistIds.value.length >= pinnedPlaylistsLimit) {
+                showToast(context, context.l10n!.pinnedPlaylistsLimit);
+              }
+            }
+            break;
+          case 'delete':
+            if (onDelete != null) onDelete!();
+            break;
+          case 'moveToFolder':
+            _showMoveToFolderDialog(context);
+            break;
+          case 'edit':
+            if (isFolder) {
+              _handleEditFolder(context);
+            } else {
+              _handleEdit(context);
+            }
+            break;
+          case 'add_to_playlist':
+            _handleAddPlaylistToPlaylist(context);
+            break;
+          case 'remove_offline':
+            if (playlistData != null && playlistData!['ytid'] != null) {
+              showRemoveOfflinePlaylistDialog(
+                context,
+                playlistData!['ytid'].toString(),
+              );
+            }
+            break;
+        }
+      },
+      itemBuilder: (BuildContext context) {
+        final isUserCreated = playlistData?['source'] == 'user-created';
+        final pinnedIds = pinnedPlaylistIds.value;
+
+        final isPinned =
+            _resolvedPlaylistId != null &&
+            pinnedIds.contains(_resolvedPlaylistId);
+
+        final isLiked =
+            _resolvedPlaylistId != null &&
+            isPlaylistAlreadyLiked(_resolvedPlaylistId);
+
+        final isOffline =
+            playlistData != null &&
+            (playlistData!['downloadedAt'] != null ||
+                playlistData!['isOffline'] == true);
+
+        return [
+          if (!isFolder && _resolvedPlaylistId != null)
+            PopupMenuItem<String>(
+              value: 'pin',
+              child: Row(
+                children: [
+                  Icon(
+                    isPinned
+                        ? FluentIcons.pin_off_24_regular
+                        : FluentIcons.pin_24_regular,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isPinned
+                        ? context.l10n!.unpinFromLibrary
+                        : context.l10n!.pinToLibrary,
+                  ),
+                ],
+              ),
+            ),
+
+          if (!isFolder && (onDelete == null || !isUserCreated))
+            PopupMenuItem<String>(
+              value: 'like',
+              child: Row(
+                children: [
+                  Icon(
+                    likeStatusToIconMapper[isLiked],
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isLiked
+                        ? context.l10n!.removeFromLikedPlaylists
+                        : context.l10n!.addToLikedPlaylists,
+                  ),
+                ],
+              ),
+            ),
+
+          if (_canAddToPlaylist)
+            PopupMenuItem<String>(
+              value: 'add_to_playlist',
+              child: Row(
+                children: [
+                  Icon(
+                    FluentIcons.album_add_24_regular,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(context.l10n!.addToPlaylist),
+                ],
+              ),
+            ),
+
+          if (isOffline)
+            PopupMenuItem<String>(
+              value: 'remove_offline',
+              child: Row(
+                children: [
+                  Icon(
+                    FluentIcons.cloud_off_24_regular,
+                    color: colorScheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(context.l10n!.removeOffline),
+                ],
+              ),
+            ),
+
+          if (playlistData != null &&
+              !isFolder &&
+              (playlistData!['source'] == 'user-created' ||
+                  playlistData!['source'] == 'user-youtube'))
+            PopupMenuItem<String>(
+              value: 'moveToFolder',
+              child: Row(
+                children: [
+                  Icon(
+                    FluentIcons.folder_24_regular,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(context.l10n!.moveToFolder),
+                ],
+              ),
+            ),
+
+          if (playlistData != null &&
+              (isFolder || playlistData!['source'] == 'user-created'))
+            PopupMenuItem<String>(
+              value: 'edit',
+              child: Row(
+                children: [
+                  Icon(FluentIcons.edit_24_regular, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    isFolder
+                        ? context.l10n!.editFolder
+                        : context.l10n!.editPlaylist,
+                  ),
+                ],
+              ),
+            ),
+
+          if (onDelete != null)
+            PopupMenuItem<String>(
+              value: 'delete',
+              child: Row(
+                children: [
+                  Icon(
+                    FluentIcons.delete_24_regular,
+                    color: isFolder ? colorScheme.error : colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isFolder
+                        ? context.l10n!.deleteFolder
+                        : context.l10n!.deletePlaylist,
+                    style: isFolder ? TextStyle(color: colorScheme.error) : null,
+                  ),
+                ],
+              ),
+            ),
+        ];
+      },
+    );
+  }
+
+  Widget _buildCardArtwork(ColorScheme colorScheme) {
+    final artwork = isArtist
+        ? normalizeArtistThumbnailUrl(playlistArtwork)
+        : playlistArtwork;
+    final fallback = Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      alignment: Alignment.center,
+      child: Icon(
+        cubeIcon,
+        size: 42,
+        color: colorScheme.onSecondaryContainer,
+      ),
+    );
+    if (artwork != null && artwork.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image(
+          image: ArtworkProvider.get(artwork),
+          width: double.infinity,
+          height: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => fallback,
+        ),
+      );
+    }
+    return fallback;
+  }
+
   Widget _buildPlaylistIcon(ColorScheme colorScheme) {
     final artwork = isArtist
         ? normalizeArtistThumbnailUrl(playlistArtwork)
         : playlistArtwork;
+    final thumbWidth = isArtist ? 52.0 : 80.0;
+    final thumbHeight = isArtist ? 52.0 : 45.0;
     if (artwork != null && artwork.isNotEmpty) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(isArtist ? 26 : 12),
+        borderRadius: BorderRadius.circular(isArtist ? 26 : 10),
         child: Image(
           image: ArtworkProvider.get(artwork),
-          width: 52,
-          height: 52,
+          width: thumbWidth,
+          height: thumbHeight,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => _buildIconFallback(colorScheme),
         ),
@@ -378,15 +441,17 @@ class PlaylistBar extends StatelessWidget {
   }
 
   Widget _buildIconFallback(ColorScheme colorScheme) {
+    final thumbWidth = isArtist ? 52.0 : 80.0;
+    final thumbHeight = isArtist ? 52.0 : 45.0;
     return Container(
-      width: 52,
-      height: 52,
+      width: thumbWidth,
+      height: thumbHeight,
       decoration: BoxDecoration(
         color: colorScheme.secondaryContainer,
         shape: isArtist ? BoxShape.circle : BoxShape.rectangle,
-        borderRadius: isArtist ? null : BorderRadius.circular(12),
+        borderRadius: isArtist ? null : BorderRadius.circular(10),
       ),
-      child: Icon(cubeIcon, size: 26, color: colorScheme.onSecondaryContainer),
+      child: Icon(cubeIcon, size: 24, color: colorScheme.onSecondaryContainer),
     );
   }
 

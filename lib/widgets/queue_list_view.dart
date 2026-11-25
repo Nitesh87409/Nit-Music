@@ -160,7 +160,7 @@ class _QueueWidgetState extends State<QueueWidget> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  context.l10n!.queue,
+                  widget.isBottomSheet ? 'Up Next' : context.l10n!.queue,
                   style: compact
                       ? TextStyle(
                           color: colorScheme.onSurface,
@@ -220,7 +220,7 @@ class _QueueWidgetState extends State<QueueWidget> {
       );
     }
     return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.35,
+      height: MediaQuery.sizeOf(context).height * 0.52,
       child: _buildList(context, colorScheme, currentIndex, closeOnTap: true),
     );
   }
@@ -496,56 +496,59 @@ class _ArtworkThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const thumbWidth = 72.0;
+    const thumbHeight = 40.0;
     final artworkPath = song['artworkPath'] as String?;
     if (artworkPath != null && artworkPath.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(radius),
         child: Image.file(
           File(artworkPath),
-          width: size,
-          height: size,
+          width: thumbWidth,
+          height: thumbHeight,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _fallback(),
+          errorBuilder: (_, __, ___) => _fallback(thumbWidth, thumbHeight),
         ),
       );
     }
-    final imageUrl = song['lowResImage']?.toString() ?? '';
-    if (imageUrl.isEmpty) return _fallback();
-    // Low-res YouTube 'default.jpg' thumbnails ship with baked-in black
-    // letterbox bars, so BoxFit.cover keeps them visible. Detect that case and
-    // stretch over the bars with fill + centerSlice, otherwise crop with cover —
-    // matching SongBar so the queue frames covers the same way (no black bars).
-    final isImageSmall = imageUrl.contains('default.jpg');
+    final imageUrl =
+        song['image']?.toString() ??
+        song['highResImage']?.toString() ??
+        song['lowResImage']?.toString() ??
+        '';
+    if (imageUrl.isEmpty) return _fallback(thumbWidth, thumbHeight);
     return CachedNetworkImage(
-      width: size,
-      height: size,
+      width: thumbWidth,
+      height: thumbHeight,
       imageUrl: imageUrl,
-      memCacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
-      memCacheHeight: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+      memCacheWidth: (thumbWidth * MediaQuery.devicePixelRatioOf(context)).round(),
       imageBuilder: (_, imageProvider) => ClipRRect(
         borderRadius: BorderRadius.circular(radius),
         child: Image(
           image: imageProvider,
-          width: size,
-          height: size,
-          fit: isImageSmall ? BoxFit.fill : BoxFit.cover,
-          centerSlice: isImageSmall ? const Rect.fromLTRB(1, 1, 1, 1) : null,
+          width: thumbWidth,
+          height: thumbHeight,
+          fit: BoxFit.cover,
         ),
       ),
-      placeholder: (_, __) => _loading(),
-      errorWidget: (_, __, ___) => _fallback(),
+      placeholder: (_, __) => _loading(thumbWidth, thumbHeight),
+      errorWidget: (_, __, ___) => _fallback(thumbWidth, thumbHeight),
     );
   }
 
-  Widget _fallback() => NullArtworkWidget(
-    size: size,
-    borderRadius: radius,
-    iconSize: size * 0.45,
+  Widget _fallback(double width, double height) => SizedBox(
+    width: width,
+    height: height,
+    child: NullArtworkWidget(
+      size: height,
+      borderRadius: radius,
+      iconSize: height * 0.48,
+    ),
   );
 
-  Widget _loading() => Container(
-    width: size,
-    height: size,
+  Widget _loading(double width, double height) => Container(
+    width: width,
+    height: height,
     decoration: BoxDecoration(
       color: colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(radius),

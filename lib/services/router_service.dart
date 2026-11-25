@@ -6,15 +6,18 @@ import 'package:musify/screens/about_page.dart';
 import 'package:musify/screens/artist_page.dart';
 import 'package:musify/screens/bottom_navigation_page.dart';
 import 'package:musify/screens/equalizer_page.dart';
+import 'package:musify/screens/generic_grid_page.dart';
 import 'package:musify/screens/home_page.dart';
 import 'package:musify/screens/library_page.dart';
+import 'package:musify/screens/login_page.dart';
 import 'package:musify/screens/playlist_folder_page.dart';
 import 'package:musify/screens/playlist_page.dart';
+import 'package:musify/screens/radio_page.dart';
 import 'package:musify/screens/search_page.dart';
 import 'package:musify/screens/settings_page.dart';
 import 'package:musify/screens/time_machine_page.dart';
-import 'package:musify/screens/generic_grid_page.dart';
 import 'package:musify/screens/user_songs_page.dart';
+import 'package:musify/services/auth_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/offline_search_placeholder.dart';
@@ -30,6 +33,13 @@ class NavigationManager {
 
   void _setupRouter() {
     final routes = [
+      GoRoute(
+        path: loginPath,
+        pageBuilder: (context, state) => getPage(
+          child: const LoginPage(),
+          state: state,
+        ),
+      ),
       StatefulShellRoute(
         parentNavigatorKey: parentNavigatorKey,
         branches: _getRouteBranches(),
@@ -56,12 +66,24 @@ class NavigationManager {
       debugLogDiagnostics: kDebugMode,
       routerNeglect: true,
       redirect: (context, state) {
-        // Handle offline mode redirects
-        final isOffline = offlineMode.value;
+        final isLoggedIn = AuthService.instance.isLoggedIn.value;
         final currentPath = state.matchedLocation;
 
+        if (!isLoggedIn && currentPath != loginPath) {
+          return loginPath;
+        }
+
+        if (isLoggedIn && currentPath == loginPath) {
+          return homePath;
+        }
+
+        // Handle offline mode redirects
+        final isOffline = offlineMode.value;
+
         if (isOffline &&
-            (currentPath == searchPath || currentPath == timeMachinePath)) {
+            (currentPath == searchPath ||
+                currentPath == timeMachinePath ||
+                currentPath == radioPath)) {
           // Redirect unavailable pages to home in offline mode
           return homePath;
         }
@@ -92,6 +114,8 @@ class NavigationManager {
       GlobalKey<NavigatorState>();
   static final GlobalKey<NavigatorState> searchTabNavigatorKey =
       GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> radioTabNavigatorKey =
+      GlobalKey<NavigatorState>();
   static final GlobalKey<NavigatorState> libraryTabNavigatorKey =
       GlobalKey<NavigatorState>();
   static final GlobalKey<NavigatorState> settingsTabNavigatorKey =
@@ -112,10 +136,12 @@ class NavigationManager {
   GoRouteInformationParser get routeInformationParser =>
       router.routeInformationParser;
 
+  static const String loginPath = '/login';
   static const String homePath = '/home';
   static const String timeMachinePath = '$homePath/timeMachine';
   static const String settingsPath = '/settings';
   static const String searchPath = '/search';
+  static const String radioPath = '/radio';
   static const String libraryPath = '/library';
 
   /// Refresh the router configuration when offline mode changes
@@ -261,7 +287,19 @@ class NavigationManager {
           ),
         ],
       ),
-      // Branch 2: Library
+      // Branch 2: Radio
+      StatefulShellBranch(
+        navigatorKey: radioTabNavigatorKey,
+        routes: [
+          GoRoute(
+            path: radioPath,
+            pageBuilder: (context, GoRouterState state) {
+              return getPage(child: const RadioPage(), state: state);
+            },
+          ),
+        ],
+      ),
+      // Branch 3: Library
       StatefulShellBranch(
         navigatorKey: libraryTabNavigatorKey,
         routes: [
@@ -306,7 +344,7 @@ class NavigationManager {
           ),
         ],
       ),
-      // Branch 3: Settings
+      // Branch 4: Settings
       StatefulShellBranch(
         navigatorKey: settingsTabNavigatorKey,
         routes: [

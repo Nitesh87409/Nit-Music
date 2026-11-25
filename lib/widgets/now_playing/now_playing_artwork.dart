@@ -26,17 +26,18 @@ class NowPlayingArtwork extends StatelessWidget {
     final screenHeight = size.height;
     final isLandscape = screenWidth > screenHeight;
     final isDesktop = screenWidth > 800;
-    final imageSize = isDesktop
-        ? screenHeight * 0.38
+    final artworkWidth = isDesktop
+        ? screenHeight * 0.48
         : isLandscape
-        ? screenHeight * 0.45
+        ? screenHeight * 0.65
         : screenWidth < 360
-        ? screenWidth * 0.75
+        ? screenWidth * 0.84
         : screenWidth < 600
-        ? screenWidth * 0.80
-        : screenWidth * 0.65;
+        ? screenWidth * 0.88
+        : screenWidth * 0.72;
+    final artworkHeight = artworkWidth * 9 / 16;
 
-    const borderRadius = 24.0;
+    const borderRadius = 20.0;
 
     return GestureDetector(
       onHorizontalDragEnd: (details) {
@@ -70,7 +71,9 @@ class NowPlayingArtwork extends StatelessWidget {
               borderRadius: BorderRadius.circular(borderRadius),
               child: SongArtworkWidget(
                 metadata: metadata,
-                size: imageSize,
+                size: artworkHeight,
+                width: artworkWidth,
+                height: artworkHeight,
                 errorWidgetIconSize: size.width / 8,
                 borderRadius: borderRadius,
               ),
@@ -78,8 +81,8 @@ class NowPlayingArtwork extends StatelessWidget {
           ),
         ),
       backWidget: Container(
-        width: imageSize,
-        height: imageSize,
+        width: artworkWidth,
+        height: artworkHeight,
         decoration: BoxDecoration(
           color: colorScheme.secondaryContainer,
           borderRadius: BorderRadius.circular(borderRadius),
@@ -97,8 +100,8 @@ class NowPlayingArtwork extends StatelessWidget {
           trackName: metadata.title,
           artistName: metadata.artist,
           duration: metadata.duration,
-          width: imageSize,
-          height: imageSize,
+          width: artworkWidth,
+          height: artworkHeight,
           onSeek: (position) {
             audioHandler.seek(position);
           },

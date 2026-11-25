@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart'
@@ -36,25 +35,33 @@ class _BottomNavigationPageState extends State<BottomNavigationPage>
     audioHandler.playbackStateStream,
     (mediaItem, playbackState) =>
         mediaItem != null &&
-        playbackState.processingState != AudioProcessingState.idle,
+        (playbackState.processingState != AudioProcessingState.idle ||
+            audioHandler.queue.value.isNotEmpty),
   ).distinct().asBroadcastStream();
 
   bool? _previousOfflineMode;
 
   /// Track the previously selected tab index to detect double-taps on the same tab.
   int? _previousTabIndex;
+  int _targetIndex = 0;
+  int _sourceIndex = 0;
 
   late final AnimationController _animationController;
   late final AnimationController _playerAnimController;
+  late final AnimationController _pageSlideController;
+  late final Animation<double> _pageSlideAnimation;
   late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
+    _targetIndex = widget.navigationShell.currentIndex;
+    _sourceIndex = widget.navigationShell.currentIndex;
+
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 250),
-      upperBound: 10.0, // High enough to cover all tabs
+      duration: const Duration(milliseconds: 260),
+      upperBound: 10, // High enough to cover all tabs
       value: widget.navigationShell.currentIndex.toDouble(),
     );
     _animation = _animationController;
@@ -63,10 +70,21 @@ class _BottomNavigationPageState extends State<BottomNavigationPage>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+
+    _pageSlideController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+      value: 1.0,
+    );
+    _pageSlideAnimation = CurvedAnimation(
+      parent: _pageSlideController,
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
   void dispose() {
+    _pageSlideController.dispose();
     _playerAnimController.dispose();
     _animationController.dispose();
     super.dispose();
@@ -82,9 +100,14 @@ class _BottomNavigationPageState extends State<BottomNavigationPage>
       final newIndex = _getCurrentIndex(items, isOffline);
       _animationController.animateTo(
         newIndex.toDouble(),
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.fastOutSlowIn,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
       );
+      if (newIndex != _targetIndex) {
+        _sourceIndex = _targetIndex;
+        _targetIndex = newIndex;
+        _pageSlideController.forward(from: 0.0);
+      }
       _previousTabIndex = widget.navigationShell.currentIndex;
     }
   }
@@ -98,11 +121,16 @@ class _BottomNavigationPageState extends State<BottomNavigationPage>
 
         final currentIndex = widget.navigationShell.currentIndex;
         if (currentIndex != 0) {
+          if (0 != _targetIndex) {
+            _sourceIndex = _targetIndex;
+            _targetIndex = 0;
+            _pageSlideController.forward(from: 0.0);
+          }
           widget.navigationShell.goBranch(0);
           _animationController.animateTo(
             0,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.fastOutSlowIn,
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
           );
         } else {
           SystemNavigator.pop();
@@ -128,6 +156,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage>
                 children: [
                   Scaffold(
                     body: SafeArea(
+                      top: false,
                       child: Row(
                         children: [
                           if (isLargeScreen)
@@ -165,10 +194,74 @@ class _BottomNavigationPageState extends State<BottomNavigationPage>
                                           bottom: mediaQuery.padding.bottom,
                                         ),
                                       ),
-                                      child: IndexedStack(
-                                        index:
-                                            widget.navigationShell.currentIndex,
-                                        children: widget.children,
+                                      child: LayoutBuilder(
+                                        builder: (context, pageConstraints) {
+                                          final width = pageConstraints.maxWidth;
+                                          return AnimatedBuilder(
+                                            animation: _pageSlideAnimation,
+                                            builder: (context, _) {
+                                              final progress = _pageSlideAnimation.value;
+                                              final isAnimating = _pageSlideController.isAnimating;
+                                              final direction = (_targetIndex >= _sourceIndex) ? 1.0 : -1.0;
+
+                                              return Stack(
+                                                fit: StackFit.expand,
+                                                children: List.generate(widget.children.length, (i) {
+                                                  if (!isAnimating) {
+                                                    final isCurrent = i == _targetIndex;
+                                                    return Offstage(
+                                                      offstage: !isCurrent,
+                                                      child: TickerMode(
+                                                        enabled: isCurrent,
+                                                        child: widget.children[i],
+                                                      ),
+                                                    );
+                                                  }
+
+                                                  if (i == _targetIndex) {
+                                                    final offset = Offset(direction * width * 0.25 * (1.0 - progress), 0);
+                                                    return Offstage(
+                                                      offstage: false,
+                                                      child: TickerMode(
+                                                        enabled: true,
+                                                        child: Transform.translate(
+                                                          offset: offset,
+                                                          child: Opacity(
+                                                            opacity: progress.clamp(0.0, 1.0),
+                                                            child: widget.children[i],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    );
+                                                  } else if (i == _sourceIndex) {
+                                                    final offset = Offset(-direction * width * 0.25 * progress, 0);
+                                                    return Offstage(
+                                                      offstage: false,
+                                                      child: TickerMode(
+                                                        enabled: true,
+                                                        child: Transform.translate(
+                                                          offset: offset,
+                                                          child: Opacity(
+                                                            opacity: (1.0 - progress).clamp(0.0, 1.0),
+                                                            child: widget.children[i],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }
+
+                                                  return Offstage(
+                                                    offstage: true,
+                                                    child: TickerMode(
+                                                      enabled: false,
+                                                      child: widget.children[i],
+                                                    ),
+                                                  );
+                                                }),
+                                              );
+                                            },
+                                          );
+                                        },
                                       ),
                                     ),
                                   ],
@@ -196,7 +289,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage>
                     initialData: audioHandler.mediaItem.value != null,
                     stream: _miniPlayerVisibilityStream,
                     builder: (context, snapshot) {
-                      if (widget.navigationShell.currentIndex == 3) {
+                      if (widget.navigationShell.currentIndex == 4) {
                         return const SizedBox.shrink();
                       }
                       final isVisible = snapshot.data == true;
@@ -205,7 +298,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage>
                         isVisible: isVisible,
                         bottomMargin: isLargeScreen
                             ? 0.0
-                            : 72.0 + MediaQuery.of(context).padding.bottom,
+                            : 54.0 + MediaQuery.of(context).padding.bottom,
                       );
                     },
                   ),
@@ -220,42 +313,51 @@ class _BottomNavigationPageState extends State<BottomNavigationPage>
 
   List<_NavigationItem> _getNavigationItems(bool isOfflineMode) {
     final items = <_NavigationItem>[
-      _NavigationItem(
-        icon: FluentIcons.home_24_regular,
-        selectedIcon: FluentIcons.home_24_filled,
-        label: context.l10n?.home ?? 'Home',
+      const _NavigationItem(
+        icon: FluentIcons.play_circle_24_regular,
+        selectedIcon: FluentIcons.play_circle_24_filled,
+        label: 'Listen',
         route: '/home',
         shellIndex: 0,
       ),
     ];
 
-    // Only add search tab in online mode
+    // Only add search and radio tabs in online mode
     if (!isOfflineMode) {
       items.add(
-        _NavigationItem(
+        const _NavigationItem(
           icon: FluentIcons.search_24_regular,
           selectedIcon: FluentIcons.search_24_filled,
-          label: context.l10n?.search ?? 'Search',
+          label: 'Search',
           route: '/search',
           shellIndex: 1,
+        ),
+      );
+      items.add(
+        const _NavigationItem(
+          icon: Icons.radio_rounded,
+          selectedIcon: Icons.radio_rounded,
+          label: 'Radio',
+          route: '/radio',
+          shellIndex: 2,
         ),
       );
     }
 
     items.addAll([
-      _NavigationItem(
-        icon: FluentIcons.book_24_regular,
-        selectedIcon: FluentIcons.book_24_filled,
-        label: context.l10n?.library ?? 'Library',
+      const _NavigationItem(
+        icon: FluentIcons.music_note_2_24_regular,
+        selectedIcon: FluentIcons.music_note_2_24_filled,
+        label: 'Library',
         route: '/library',
-        shellIndex: 2,
+        shellIndex: 3,
       ),
-      _NavigationItem(
+      const _NavigationItem(
         icon: FluentIcons.settings_24_regular,
         selectedIcon: FluentIcons.settings_24_filled,
-        label: context.l10n?.settings ?? 'Settings',
+        label: 'Settings',
         route: '/settings',
-        shellIndex: 3,
+        shellIndex: 4,
       ),
     ]);
 
@@ -267,8 +369,10 @@ class _BottomNavigationPageState extends State<BottomNavigationPage>
 
     final currentRoute = GoRouterState.of(context).matchedLocation;
 
-    // If we're switching to offline mode and currently on search tab
-    if (isOfflineMode && currentRoute.startsWith('/search')) {
+    // If we're switching to offline mode and currently on search or radio tab
+    if (isOfflineMode &&
+        (currentRoute.startsWith('/search') ||
+            currentRoute.startsWith('/radio'))) {
       // Navigate to home
       widget.navigationShell.goBranch(0);
     }
@@ -282,12 +386,19 @@ class _BottomNavigationPageState extends State<BottomNavigationPage>
       // Close any open bottom sheet before switching tabs
       closeCurrentBottomSheet();
 
-      // Animate the bottom bar pill indicator to this tab
+      // Animate the bottom bar sliding indicator to this tab (120fps glide)
       _animationController.animateTo(
         index.toDouble(),
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.fastOutSlowIn,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
       );
+
+      // Trigger smooth directional page transition
+      if (item.shellIndex != _targetIndex) {
+        _sourceIndex = _targetIndex;
+        _targetIndex = item.shellIndex;
+        _pageSlideController.forward(from: 0.0);
+      }
 
       // If user taps the same tab again, reset it to initial state.
       // Otherwise, preserve the branch state.
@@ -357,98 +468,98 @@ class CustomBottomNavigationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+
+    // Active color from user CSS: #e11d48
+    const activeColor = Color(0xFFE11D48);
+    // Inactive color from user CSS: #8c857b
+    const inactiveColor = Color(0xFF8C857B);
 
     return Container(
-      height: 70,
-      color: theme.colorScheme.surface,
+      height: 54 + bottomPadding,
+      padding: EdgeInsets.only(left: 6, right: 6, bottom: bottomPadding),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? const Color(0x1FFFFFFF) : const Color(0xFFE7E2DA),
+          ),
+        ),
+      ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final tabWidth = constraints.maxWidth / items.length;
+          const indicatorWidth = 28.0;
 
           return Stack(
             children: [
-              // The animated pill
+              // Single Smooth Gliding Top Red Indicator Bar (120 FPS continuous swipe)
               AnimatedBuilder(
                 animation: animation,
-                builder: (context, child) {
-                  // Center the 64px pill horizontally within the active tab
-                  final leftOffset =
-                      animation.value * tabWidth + (tabWidth - 64) / 2;
-
-                  return Transform.translate(
-                    offset: Offset(leftOffset, 10),
+                builder: (context, _) {
+                  final left = (tabWidth * animation.value) +
+                      (tabWidth - indicatorWidth) / 2;
+                  return Positioned(
+                    top: 0,
+                    left: left.clamp(0.0, constraints.maxWidth - indicatorWidth),
                     child: Container(
-                      width: 64,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(16),
+                      width: indicatorWidth,
+                      height: 2.5,
+                      decoration: const BoxDecoration(
+                        color: activeColor,
+                        borderRadius: BorderRadius.only(
+                          bottomLeft: Radius.circular(4),
+                          bottomRight: Radius.circular(4),
+                        ),
                       ),
                     ),
                   );
                 },
               ),
 
-              // The icons and labels
+              // Navigation Tab Items Row
               Row(
                 children: List.generate(items.length, (index) {
                   final item = items[index];
+                  final isSelected = selectedIndex == index;
+
                   return Expanded(
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => onDestinationSelected(index),
-                      child: AnimatedBuilder(
-                        animation: animation,
-                        builder: (context, child) {
-                          // Distance from the current animating index to this item's index
-                          // 0.0 means perfectly centered on this item.
-                          // 1.0 or greater means the pill is completely on another item.
-                          final distance = (animation.value - index).abs();
-                          final isSelected = distance < 0.5;
-                          final t = (1.0 - distance).clamp(
-                            0.0,
-                            1.0,
-                          ); // 1.0 when active, 0.0 when inactive
-
-                          final iconColor = Color.lerp(
-                            colorScheme.onSurfaceVariant,
-                            colorScheme.onPrimaryContainer,
-                            t,
-                          );
-
-                          final labelColor = Color.lerp(
-                            colorScheme.onSurfaceVariant,
-                            colorScheme.onSurface,
-                            t,
-                          );
-
-                          final fontWeight = isSelected
-                              ? FontWeight.w600
-                              : FontWeight.w500;
-
-                          return Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: Icon(
                                 isSelected ? item.selectedIcon : item.icon,
-                                color: iconColor,
-                                size: 24,
+                                key: ValueKey(isSelected),
+                                color: isSelected ? activeColor : inactiveColor,
+                                size: 19,
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                item.label,
-                                style: TextStyle(
-                                  color: labelColor,
-                                  fontSize: 12,
-                                  fontWeight: fontWeight,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            AnimatedDefaultTextStyle(
+                              duration: const Duration(milliseconds: 200),
+                              style: TextStyle(
+                                color: isSelected ? activeColor : inactiveColor,
+                                fontSize: 9.5,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                                letterSpacing: 0.1,
+                                fontFamily: theme.textTheme.bodyMedium?.fontFamily,
                               ),
-                            ],
-                          );
-                        },
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              child: Text(item.label),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );

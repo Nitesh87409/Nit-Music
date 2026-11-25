@@ -17,7 +17,9 @@ class MarqueeTextWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MarqueeWidget(
-      backDuration: const Duration(seconds: 1),
+      animationDuration: const Duration(seconds: 9),
+      backDuration: const Duration(seconds: 6),
+      pauseDuration: const Duration(milliseconds: 1500),
       child: Text(
         text,
         style: TextStyle(

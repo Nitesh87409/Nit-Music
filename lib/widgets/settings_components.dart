@@ -15,16 +15,16 @@ class SettingsCardGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
               children: [
                 if (icon != null) ...[
-                  Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+                  Icon(icon, size: 20, color: const Color(0xFFE11D48)),
                   const SizedBox(width: 8),
                 ],
                 Text(
@@ -32,33 +32,27 @@ class SettingsCardGroup extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ],
             ),
           ),
-          Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              children: [
-                for (int i = 0; i < children.length; i++) ...[
-                  children[i],
-                  if (i < children.length - 1)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 56.0, right: 16.0),
-                      child: Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
-                      ),
+          Column(
+            children: [
+              for (int i = 0; i < children.length; i++) ...[
+                children[i],
+                if (i < children.length - 1)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 62.0, right: 16.0),
+                    child: Divider(
+                      height: 1,
+                      thickness: 0.5,
+                      color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.3),
                     ),
-                ]
-              ],
-            ),
+                  ),
+              ]
+            ],
           ),
         ],
       ),
@@ -96,39 +90,19 @@ class ModernSettingsTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(20),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0x262196F3), // Colors.blue with opacity
-                      Color(0x26E91E63), // Colors.pink with opacity
-                      Color(0x26FF9800), // Colors.orange with opacity
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              SizedBox(
+                width: 32,
+                height: 32,
+                child: Center(
+                  child: Icon(
+                    icon,
+                    size: 22,
+                    color: theme.colorScheme.onSurface,
                   ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: ShaderMask(
-                  shaderCallback: (Rect bounds) {
-                    return const LinearGradient(
-                      colors: [
-                        Colors.blue,
-                        Colors.pink,
-                        Colors.orange,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ).createShader(bounds);
-                  },
-                  child: Icon(icon, size: 20, color: Colors.white),
                 ),
               ),
               const SizedBox(width: 14),
@@ -253,8 +227,8 @@ class ModernSwitch extends StatelessWidget {
       child: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: colorScheme.primary,
-        activeTrackColor: colorScheme.primary.withValues(alpha: 0.25),
+        activeColor: Colors.white,
+        activeTrackColor: const Color(0xFFE11D48),
         inactiveThumbColor: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
         inactiveTrackColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         trackOutlineColor: WidgetStateProperty.all(Colors.transparent),

@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "44667727867",
+    "project_id": "nitmusic-da216",
+    "storage_bucket": "nitmusic-da216.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:44667727867:android:5736ef0db65414c2cce55e",
+        "android_client_info": {
+          "package_name": "com.musify.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "44667727867-5sm1rgf8trqsdrl7cbb21drsrdh083au.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.musify.app",
+            "certificate_hash": "70228874c7751c23bde30f6baf550acbdb0971cd"
+          }
+        },
+        {
+          "client_id": "44667727867-8ttbcam37qekqi1gea4onrkfvb1ha6e8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.musify.app",
+            "certificate_hash": "f3bae461790d9a7fb94a0b352eb494e3c27383ad"
+          }
+        },
+        {
+          "client_id": "44667727867-v51gu4rb8pfpkiirus599or3he62n6jf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD65kiohgF2eZorIdbXoo0znkcaRL2vaAg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "44667727867-v51gu4rb8pfpkiirus599or3he62n6jf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

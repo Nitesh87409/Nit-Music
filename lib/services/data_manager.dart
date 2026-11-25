@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart' show logger;
+import 'package:musify/services/sync_service.dart';
 
 // Cache durations for different types of data
 const Duration songCacheDuration = Duration(hours: 1, minutes: 30);
@@ -63,6 +64,11 @@ Future<void> addOrUpdateData<T>(String category, String key, T value) async {
     final cacheKey = '${category}_$key';
     _setMemoryCacheEntry(cacheKey, _CacheEntry(value, DateTime.now()));
   }
+
+  // Sync to cloud if logged in
+  if (category == 'user') {
+    SyncService.instance.queueSync(key, value);
+  }
 }
 
 Future<dynamic> getData(
@@ -111,6 +117,11 @@ Future<void> deleteData(String category, String key) async {
 
   final _box = await _openBox(category);
   await _box.delete(key);
+
+  // Sync deletion to cloud if logged in
+  if (category == 'user') {
+    SyncService.instance.queueSync(key, null);
+  }
 }
 
 Future<bool> clearCache() async {

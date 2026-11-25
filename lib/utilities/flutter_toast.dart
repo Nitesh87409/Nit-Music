@@ -9,7 +9,6 @@ void showToast(
   Duration duration = const Duration(seconds: 3),
   IconData? icon,
 }) {
-  final colorScheme = Theme.of(context).colorScheme;
   final isMiniPlayerVisible = audioHandler.mediaItem.value != null;
   final bottomMargin =
       12.0 + (isMiniPlayerVisible ? MiniPlayer.playerHeight : 0.0);
@@ -22,7 +21,7 @@ void showToast(
         children: [
           Icon(
             icon ?? FluentIcons.checkmark_circle_20_regular,
-            color: colorScheme.onSecondaryContainer,
+            color: Colors.white,
             size: 20,
           ),
           const SizedBox(width: 12),
@@ -42,7 +41,6 @@ void showToastWithButton(
   Duration duration = const Duration(seconds: 3),
   IconData? icon,
 }) {
-  final colorScheme = Theme.of(context).colorScheme;
   final isMiniPlayerVisible = audioHandler.mediaItem.value != null;
   final bottomMargin =
       12.0 + (isMiniPlayerVisible ? MiniPlayer.playerHeight : 0.0);
@@ -55,7 +53,7 @@ void showToastWithButton(
         children: [
           Icon(
             icon ?? FluentIcons.info_20_regular,
-            color: colorScheme.onSecondaryContainer,
+            color: Colors.white,
             size: 20,
           ),
           const SizedBox(width: 12),

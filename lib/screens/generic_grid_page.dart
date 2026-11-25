@@ -29,7 +29,7 @@ class GenericGridPage extends StatelessWidget {
                 crossAxisCount: 2,
                 crossAxisSpacing: 16.0,
                 mainAxisSpacing: 24.0,
-                childAspectRatio: 0.8,
+                childAspectRatio: 1.12,
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
@@ -47,14 +47,14 @@ class GenericGridPage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         AspectRatio(
-                          aspectRatio: 1,
+                          aspectRatio: 16 / 9,
                           child: Container(
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(14),
                               color: Theme.of(context).colorScheme.surfaceContainerHighest,
                               image: imageUrl.isNotEmpty
                                   ? DecorationImage(
-                                      image: CachedNetworkImageProvider(imageUrl, maxWidth: 400, maxHeight: 400),
+                                      image: CachedNetworkImageProvider(imageUrl, maxWidth: 480, maxHeight: 270),
                                       fit: BoxFit.cover,
                                     )
                                   : null,

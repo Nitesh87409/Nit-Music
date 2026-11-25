@@ -73,6 +73,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
   final ValueNotifier<String> _searchQueryNotifier = ValueNotifier('');
   late final TextEditingController _searchController;
   late final FocusNode _searchFocusNode;
+  final ScrollController _scrollController = ScrollController();
 
   List<dynamic> _getSourceList(String searchQuery) {
     final list = _playlist?['list'] as List<dynamic>? ?? [];
@@ -90,12 +91,24 @@ class _PlaylistPageState extends State<PlaylistPage> {
     super.initState();
     _searchController = TextEditingController();
     _searchFocusNode = FocusNode();
+    _scrollController.addListener(_onScroll);
     userLikedPlaylists.addListener(_syncPlaylistLikeStatus);
     _initializePlaylist();
   }
 
+  void _onScroll() {
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 250) {
+      if (widget.isArtist && !_isLoadingMoreArtistSongs) {
+        _loadMoreArtistSongs();
+      }
+    }
+  }
+
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     userLikedPlaylists.removeListener(_syncPlaylistLikeStatus);
     playlistLikeStatus.dispose();
     _searchController.dispose();
@@ -308,6 +321,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
                 )
               : _playlist != null
               ? CustomScrollView(
+                  controller: _scrollController,
                   physics: const BouncingScrollPhysics(
                     parent: AlwaysScrollableScrollPhysics(),
                   ),
@@ -438,7 +452,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
                   playlistTitle,
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: theme.colorScheme.onSurface,
                     letterSpacing: -0.3,
                   ),
                   maxLines: 2,
@@ -453,7 +467,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
                           ? context.l10n!.album
                           : context.l10n!.playlist),
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.white70,
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -484,13 +498,13 @@ class _PlaylistPageState extends State<PlaylistPage> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
+                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       _playlist['subtitle'].toString(),
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: Colors.white70,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -510,14 +524,16 @@ class _PlaylistPageState extends State<PlaylistPage> {
         ? normalizeArtistThumbnailUrl(_playlist['image']?.toString())
         : _playlist['image']?.toString();
     final isCircle = widget.isArtist;
+    final thumbWidth = isCircle ? size : 160.0;
+    final thumbHeight = isCircle ? size : 90.0;
     final borderWidth = 3.0;
 
     return Container(
-      width: size,
-      height: size,
+      width: thumbWidth,
+      height: thumbHeight,
       decoration: BoxDecoration(
         shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
-        borderRadius: isCircle ? null : BorderRadius.circular(16),
+        borderRadius: isCircle ? null : BorderRadius.circular(14),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -532,26 +548,37 @@ class _PlaylistPageState extends State<PlaylistPage> {
       child: ClipRRect(
         borderRadius: isCircle
             ? BorderRadius.circular(size / 2)
-            : BorderRadius.circular(13),
+            : BorderRadius.circular(11),
         child: imageUrl != null && imageUrl.isNotEmpty
             ? Image.network(
                 imageUrl,
-                width: size - borderWidth * 2,
-                height: size - borderWidth * 2,
+                width: thumbWidth - borderWidth * 2,
+                height: thumbHeight - borderWidth * 2,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _buildPlaceholderImage(size - borderWidth * 2),
+                errorBuilder: (_, __, ___) => _buildPlaceholderImage(
+                  thumbWidth - borderWidth * 2,
+                  thumbHeight - borderWidth * 2,
+                ),
               )
-            : _buildPlaceholderImage(size - borderWidth * 2),
+            : _buildPlaceholderImage(
+                thumbWidth - borderWidth * 2,
+                thumbHeight - borderWidth * 2,
+              ),
       ),
     );
   }
 
-  Widget _buildPlaceholderImage(double size) {
+  Widget _buildPlaceholderImage(double width, double height) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      width: size,
-      height: size,
-      color: Theme.of(context).colorScheme.surfaceContainerHigh,
-      child: Icon(widget.cubeIcon, size: size * 0.4, color: Colors.white38),
+      width: width,
+      height: height,
+      color: colorScheme.surfaceContainerHigh,
+      child: Icon(
+        widget.cubeIcon,
+        size: height * 0.4,
+        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+      ),
     );
   }
 
@@ -564,13 +591,13 @@ class _PlaylistPageState extends State<PlaylistPage> {
           value,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
-            color: accentColor ?? Colors.white,
+            color: accentColor ?? theme.colorScheme.onSurface,
           ),
         ),
         Text(
           label,
           style: theme.textTheme.labelSmall?.copyWith(
-            color: Colors.white60,
+            color: theme.colorScheme.onSurfaceVariant,
             fontSize: 11,
           ),
         ),
@@ -626,8 +653,8 @@ class _PlaylistPageState extends State<PlaylistPage> {
           Expanded(
             child: FilledButton.icon(
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.white.withValues(alpha: 0.05),
-                foregroundColor: Colors.white,
+                backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+                foregroundColor: colorScheme.onSurface,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -660,7 +687,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
 
   Widget _buildTab(String title, bool isSelected, Color? accentColor) {
     final theme = Theme.of(context);
-    final color = isSelected ? (accentColor ?? theme.colorScheme.primary) : Colors.white70;
+    final color = isSelected
+        ? (accentColor ?? theme.colorScheme.primary)
+        : theme.colorScheme.onSurfaceVariant;
     
     return Container(
       padding: const EdgeInsets.only(bottom: 8),
@@ -734,21 +763,29 @@ class _PlaylistPageState extends State<PlaylistPage> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(FluentIcons.filter_24_regular, size: 14, color: Colors.white70),
+                          Icon(
+                            FluentIcons.filter_24_regular,
+                            size: 14,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             _getSortTypeDisplayText(_sortType),
                             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Colors.white70,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
-                          const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.white70),
+                          Icon(
+                            Icons.keyboard_arrow_down,
+                            size: 16,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                         ],
                       ),
                     ),

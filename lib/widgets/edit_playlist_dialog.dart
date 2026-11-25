@@ -1,6 +1,8 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/main.dart' show logger;
+import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/playlist_image_picker.dart';
 
 class EditPlaylistDialog extends StatefulWidget {
@@ -41,12 +43,24 @@ class _EditPlaylistDialogState extends State<EditPlaylistDialog> {
   }
 
   Future<void> _pickImage() async {
-    final result = await pickImage();
-    if (result != null) {
-      setState(() {
-        _imageBase64 = result;
-        _imageUrlController.text = '';
-      });
+    try {
+      final result = await pickImage();
+      if (!mounted) return;
+      if (result != null) {
+        setState(() {
+          _imageBase64 = result;
+          _imageUrlController.text = '';
+        });
+      }
+    } catch (e, stackTrace) {
+      logger.log(
+        'Error picking image in EditPlaylistDialog',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        showToast(context, context.l10n!.error);
+      }
     }
   }
 

@@ -29,6 +29,7 @@ import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'package:musify/constants/clients.dart';
 import 'package:musify/main.dart' show logger;
+import 'package:musify/services/artist_service.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/io_service.dart';
 import 'package:musify/services/lyrics_manager.dart';
@@ -161,7 +162,9 @@ Future<bool> _validateCachedUrl(String cachedUrl) async {
 Future<List> fetchSongsList(String searchQuery) async {
   try {
     // If not in cache, perform the search
-    final List<Video> searchResults = await ytClient.search.search(searchQuery);
+    final List<Video> searchResults = await ytClient.search
+        .search(searchQuery)
+        .timeout(const Duration(seconds: 8));
     final songsList = searchResults
         .map((video) => returnSongLayout(0, video))
         .toList();
@@ -173,9 +176,43 @@ Future<List> fetchSongsList(String searchQuery) async {
   }
 }
 
+Future<List>? _recommendedSongsInFlight;
+List _recommendedSongsCache = [];
+DateTime? _recommendedSongsCacheTime;
+bool? _recommendedCacheExternal;
+
 Future<List> getRecommendedSongs() async {
+  final isExternal = externalRecommendations.value;
+  if (_recommendedSongsCache.isNotEmpty &&
+      _recommendedCacheExternal == isExternal &&
+      _recommendedSongsCacheTime != null &&
+      DateTime.now().difference(_recommendedSongsCacheTime!).inMinutes < 15) {
+    return _recommendedSongsCache;
+  }
+  if (_recommendedSongsInFlight != null) {
+    return _recommendedSongsInFlight!;
+  }
+
+  final future = _fetchRecommendedSongs(isExternal);
+  _recommendedSongsInFlight = future;
   try {
-    if (externalRecommendations.value && userRecentlyPlayed.value.isNotEmpty) {
+    final result = await future;
+    if (result.isNotEmpty) {
+      _recommendedSongsCache = result;
+      _recommendedSongsCacheTime = DateTime.now();
+      _recommendedCacheExternal = isExternal;
+    }
+    return result;
+  } finally {
+    if (identical(_recommendedSongsInFlight, future)) {
+      _recommendedSongsInFlight = null;
+    }
+  }
+}
+
+Future<List> _fetchRecommendedSongs(bool isExternal) async {
+  try {
+    if (isExternal && userRecentlyPlayed.value.isNotEmpty) {
       return await _getRecommendationsFromRecentlyPlayed();
     } else {
       return await _getRecommendationsFromMixedSources();
@@ -186,14 +223,14 @@ Future<List> getRecommendedSongs() async {
       error: e,
       stackTrace: stackTrace,
     );
-    return [];
+    return _recommendedSongsCache.isNotEmpty ? _recommendedSongsCache : [];
   }
 }
 
 Future<List> _getRecommendationsFromRecentlyPlayed() async {
   final recent = (List.from(
     userRecentlyPlayed.value,
-  )..shuffle()).take(5).toList();
+  )..shuffle()).take(3).toList();
 
   return _getRecommendationsFromSeedSongs(recent);
 }
@@ -213,8 +250,14 @@ Future<List> _getRecommendationsFromSeedSongs(List seedSongs) async {
     final seedIndex = entry.key;
     final songData = entry.value;
     try {
-      final song = await ytClient.videos.get(songData['ytid']);
-      final related = await ytClient.videos.getRelatedVideos(song) ?? [];
+      final song = await ytClient.videos
+          .get(songData['ytid'])
+          .timeout(const Duration(seconds: 6));
+      final related =
+          await ytClient.videos
+              .getRelatedVideos(song)
+              .timeout(const Duration(seconds: 6)) ??
+          [];
       for (var i = 0; i < related.length && i < 8; i++) {
         final s = returnSongLayout(0, related[i]);
         final id = s['ytid'];
@@ -648,7 +691,7 @@ Future<void> getSimilarSong(String songYtId) async {
     if (relatedSongs.isNotEmpty) {
       nextRecommendedSongs = relatedSongs
           .where((s) => s.duration != null && s.duration!.inMinutes <= 15)
-          .take(20)
+          .take(30)
           .map((s) => returnSongLayout(0, s))
           .toList();
     } else {
@@ -1209,15 +1252,19 @@ Future<void> removeFromRecentlyPlayed(dynamic songId) async {
 
 // ===== UI compatibility layer =====
 List<dynamic> nextRecommendedSongs = [];
-int _currentSearchPage = 1;
-String _lastSearchQuery = '';
 
 Future<Map<String, dynamic>> fetchSongsListWithPagination(String searchQuery) async {
   try {
-    _currentSearchPage = 1;
-    _lastSearchQuery = searchQuery;
-    final results = await fetchSongsList(searchQuery);
-    return {'songs': results, 'nextPage': null};
+    final searchResults = await ytClient.search
+        .search(searchQuery)
+        .timeout(const Duration(seconds: 8));
+    final songsList = searchResults
+        .map((video) => returnSongLayout(0, video))
+        .toList();
+    return {
+      'songs': songsList,
+      'nextPage': searchResults,
+    };
   } catch (e, stackTrace) {
     logger.log('Error in fetchSongsListWithPagination', error: e, stackTrace: stackTrace);
     return {'songs': [], 'nextPage': null};
@@ -1226,7 +1273,25 @@ Future<Map<String, dynamic>> fetchSongsListWithPagination(String searchQuery) as
 
 Future<Map<String, dynamic>> fetchNextSongsList(dynamic currentList) async {
   if (currentList == null) return {'songs': [], 'nextPage': null};
-  return {'songs': [], 'nextPage': null};
+  try {
+    if (currentList is VideoSearchList) {
+      final VideoSearchList? nextPage = await currentList.nextPage();
+      if (nextPage == null) {
+        return {'songs': [], 'nextPage': null};
+      }
+      final songsList = nextPage
+          .map((video) => returnSongLayout(0, video))
+          .toList();
+      return {
+        'songs': songsList,
+        'nextPage': nextPage,
+      };
+    }
+    return {'songs': [], 'nextPage': null};
+  } catch (e, stackTrace) {
+    logger.log('Error in fetchNextSongsList', error: e, stackTrace: stackTrace);
+    return {'songs': [], 'nextPage': null};
+  }
 }
 
 Future<List> getQuickPicks() async {
@@ -1266,7 +1331,9 @@ Future<List> getTrendingSongs() async {
         DateTime.now().difference(_trendingCacheTime!).inMinutes < 30) {
       return _trendingCache;
     }
-    final results = await ytClient.search.search('india trending songs');
+    final results = await ytClient.search
+        .search('india trending songs')
+        .timeout(const Duration(seconds: 8));
     final songs = results.map((video) => returnSongLayout(0, video)).toList();
     if (songs.isNotEmpty) {
       _trendingCache = songs;
@@ -1277,5 +1344,313 @@ Future<List> getTrendingSongs() async {
     logger.log('Error in getTrendingSongs', error: e, stackTrace: stackTrace);
     if (_trendingCache.isNotEmpty) return _trendingCache;
     return [];
+  }
+}
+
+// ===== Popular Albums, Radio & Artists (YouTube API) =====
+
+List _popularAlbumsCache = [];
+DateTime? _popularAlbumsCacheTime;
+
+Future<List> getPopularAlbumsAndSingles() async {
+  try {
+    if (_popularAlbumsCache.isNotEmpty &&
+        _popularAlbumsCacheTime != null &&
+        DateTime.now().difference(_popularAlbumsCacheTime!).inMinutes < 30) {
+      return _popularAlbumsCache;
+    }
+
+    final albums = <Map<String, dynamic>>[];
+
+    try {
+      final searchResults = await ytClient.search.searchContent(
+        'bollywood hit album playlist',
+        filter: TypeFilters.playlist,
+      );
+
+      for (final item in searchResults) {
+        if (item is SearchPlaylist) {
+          final thumb = item.thumbnails.isNotEmpty
+              ? item.thumbnails.first.url.toString()
+              : '';
+          albums.add({
+            'ytid': item.id.toString(),
+            'title': item.title.replaceAll(RegExp('playlist|full album|audio jukebox', caseSensitive: false), '').trim(),
+            'rawTitle': item.title,
+            'image': thumb,
+            'subtitle': 'Album',
+            'isAlbum': true,
+          });
+        }
+        if (albums.length >= 12) break;
+      }
+    } catch (_) {}
+
+    if (albums.length < 5) {
+      final results = await ytClient.search.search('popular hindi hit album songs');
+      for (final video in results.take(12)) {
+        final song = returnSongLayout(0, video);
+        albums.add({
+          ...song,
+          'subtitle': 'Single',
+          'isAlbum': false,
+        });
+      }
+    }
+
+    if (albums.isNotEmpty) {
+      _popularAlbumsCache = albums;
+      _popularAlbumsCacheTime = DateTime.now();
+    }
+    return albums;
+  } catch (e, stackTrace) {
+    logger.log('Error in getPopularAlbumsAndSingles', error: e, stackTrace: stackTrace);
+    if (_popularAlbumsCache.isNotEmpty) return _popularAlbumsCache;
+    return [];
+  }
+}
+
+List _popularRadioCache = [];
+DateTime? _popularRadioCacheTime;
+
+Future<List> getPopularRadioStations() async {
+  try {
+    if (_popularRadioCache.isNotEmpty &&
+        _popularRadioCacheTime != null &&
+        DateTime.now().difference(_popularRadioCacheTime!).inMinutes < 30) {
+      return _popularRadioCache;
+    }
+
+    final radioItems = <Map<String, dynamic>>[];
+
+    try {
+      final searchResults = await ytClient.search.searchContent(
+        'hindi artist radio mix playlist',
+        filter: TypeFilters.playlist,
+      );
+
+      for (final item in searchResults) {
+        if (item is SearchPlaylist) {
+          final thumb = item.thumbnails.isNotEmpty
+              ? item.thumbnails.first.url.toString()
+              : '';
+          final cleanTitle = item.title
+              .replaceAll(RegExp('playlist|full album|songs?|jukebox|audio|official', caseSensitive: false), '')
+              .trim();
+          radioItems.add({
+            'ytid': item.id.toString(),
+            'title': cleanTitle.isNotEmpty ? cleanTitle : item.title,
+            'rawTitle': item.title,
+            'image': thumb,
+            'subtitle': 'Popular Radio',
+            'isRadio': true,
+          });
+        }
+        if (radioItems.length >= 12) break;
+      }
+    } catch (_) {}
+
+    if (radioItems.length < 4) {
+      final popularArtists = [
+        {'name': 'Arijit Singh', 'sub': 'Arijit Singh, Pritam, Atif Aslam...'},
+        {'name': 'Sidhu Moose Wala', 'sub': 'Sidhu Moose Wala, Karan Aujla, AP Dhillon...'},
+        {'name': 'Diljit Dosanjh', 'sub': 'Diljit Dosanjh, Badshah, Yo Yo Honey Singh...'},
+        {'name': 'Shreya Ghoshal', 'sub': 'Shreya Ghoshal, Sunidhi Chauhan, Neha Kakkar...'},
+        {'name': 'Pritam', 'sub': 'Pritam, Sachin-Jigar, Mithoon...'},
+        {'name': 'Atif Aslam', 'sub': 'Atif Aslam, Rahat Fateh Ali Khan, KK...'},
+      ];
+
+      final results = await Future.wait(
+        popularArtists.map((artist) async {
+          try {
+            final res = await ytClient.search.search('${artist['name']} mix playlist');
+            if (res.isNotEmpty) {
+              final video = res.first;
+              return {
+                'ytid': video.id.toString(),
+                'title': '${artist['name']} Radio',
+                'artist': artist['name'],
+                'image': video.thumbnails.standardResUrl,
+                'subtitle': artist['sub'],
+                'isRadio': true,
+              };
+            }
+          } catch (_) {}
+          return null;
+        }),
+      );
+
+      for (final r in results) {
+        if (r != null) radioItems.add(r);
+      }
+    }
+
+    if (radioItems.isNotEmpty) {
+      _popularRadioCache = radioItems;
+      _popularRadioCacheTime = DateTime.now();
+    }
+    return radioItems;
+  } catch (e, stackTrace) {
+    logger.log('Error in getPopularRadioStations', error: e, stackTrace: stackTrace);
+    if (_popularRadioCache.isNotEmpty) return _popularRadioCache;
+    return [];
+  }
+}
+
+List _popularArtistsCache = [];
+DateTime? _popularArtistsCacheTime;
+
+Future<List> getPopularArtistsList() async {
+  try {
+    if (_popularArtistsCache.isNotEmpty &&
+        _popularArtistsCacheTime != null &&
+        DateTime.now().difference(_popularArtistsCacheTime!).inMinutes < 30) {
+      return _popularArtistsCache;
+    }
+
+    final topArtists = [
+      'Arijit Singh',
+      'Sidhu Moose Wala',
+      'Diljit Dosanjh',
+      'Shreya Ghoshal',
+      'Pritam',
+      'Atif Aslam',
+      'Karan Aujla',
+      'Yo Yo Honey Singh',
+      'Badshah',
+      'Anirudh Ravichander',
+      'A.R. Rahman',
+      'Neha Kakkar',
+    ];
+
+    // Check if trending songs have more recent popular artists
+    final dynamicArtists = <String>[];
+    if (_trendingCache.isNotEmpty) {
+      for (final song in _trendingCache) {
+        final artist = song['artist']?.toString().trim();
+        if (artist != null &&
+            artist.isNotEmpty &&
+            !artist.toLowerCase().contains('various') &&
+            !dynamicArtists.contains(artist)) {
+          dynamicArtists.add(artist);
+        }
+      }
+    }
+
+    final mergedArtistNames = {...dynamicArtists, ...topArtists}.take(12).toList();
+
+    final artistResults = await Future.wait(
+      mergedArtistNames.map((name) async {
+        try {
+          final res = await searchVerifiedArtists(name, limit: 1);
+          if (res.isNotEmpty) {
+            final artist = res.first;
+            final image = artist['image']?.toString();
+            if (image != null && image.isNotEmpty) {
+              return artist;
+            }
+          }
+          final fallback = await ytClient.search
+              .search(name)
+              .timeout(const Duration(seconds: 6));
+          if (fallback.isNotEmpty) {
+            final video = fallback.first;
+            return {
+              'ytid': name,
+              'title': name,
+              'image': video.thumbnails.standardResUrl,
+              'videoAuthor': video.author,
+              'isArtist': true,
+            };
+          }
+        } catch (_) {}
+        return null;
+      }),
+    );
+
+    final validArtists = artistResults.whereType<Map<String, dynamic>>().toList();
+
+    if (validArtists.isNotEmpty) {
+      _popularArtistsCache = validArtists;
+      _popularArtistsCacheTime = DateTime.now();
+    }
+    return validArtists;
+  } catch (e, stackTrace) {
+    logger.log('Error in getPopularArtistsList', error: e, stackTrace: stackTrace);
+    if (_popularArtistsCache.isNotEmpty) return _popularArtistsCache;
+    return [];
+  }
+}
+
+final Map<String, List> _moodTracksCache = {};
+final Map<String, List> _moodPlaylistsCache = {};
+
+Future<List> getMoodTracks(String mood) async {
+  if (_moodTracksCache.containsKey(mood) && _moodTracksCache[mood]!.isNotEmpty) {
+    return _moodTracksCache[mood]!;
+  }
+  try {
+    final query = '$mood songs hits';
+    final searchList = await ytClient.search
+        .search(query)
+        .timeout(const Duration(seconds: 8));
+    final songs = searchList.take(20).map((video) {
+      return {
+        'ytid': video.id.value,
+        'title': video.title,
+        'artist': video.author,
+        'image': video.thumbnails.standardResUrl,
+        'lowResImage': video.thumbnails.lowResUrl,
+        'highResImage': video.thumbnails.maxResUrl,
+        'duration': video.duration?.inSeconds ?? 0,
+        'isLive': video.isLive,
+      };
+    }).toList();
+    if (songs.isNotEmpty) {
+      _moodTracksCache[mood] = songs;
+    }
+    return songs;
+  } catch (e, stackTrace) {
+    logger.log('Error in getMoodTracks($mood)', error: e, stackTrace: stackTrace);
+    return _moodTracksCache[mood] ?? [];
+  }
+}
+
+Future<List> getMoodPlaylists(String mood) async {
+  if (_moodPlaylistsCache.containsKey(mood) && _moodPlaylistsCache[mood]!.isNotEmpty) {
+    return _moodPlaylistsCache[mood]!;
+  }
+  try {
+    final query = '$mood playlist';
+    final searchList = await ytClient.search
+        .searchContent(
+          query,
+          filter: TypeFilters.playlist,
+        )
+        .timeout(const Duration(seconds: 8));
+    final playlists = <Map<String, dynamic>>[];
+    for (final item in searchList) {
+      if (item is SearchPlaylist) {
+        final thumb = item.thumbnails.isNotEmpty
+            ? item.thumbnails.first.url.toString()
+            : '';
+        playlists.add({
+          'ytid': item.id.toString(),
+          'title': item.title,
+          'image': thumb,
+          'artist': 'Playlist',
+          'songCount': item.videoCount,
+          'isPlaylist': true,
+        });
+      }
+      if (playlists.length >= 10) break;
+    }
+    if (playlists.isNotEmpty) {
+      _moodPlaylistsCache[mood] = playlists;
+    }
+    return playlists;
+  } catch (e, stackTrace) {
+    logger.log('Error in getMoodPlaylists($mood)', error: e, stackTrace: stackTrace);
+    return _moodPlaylistsCache[mood] ?? [];
   }
 }

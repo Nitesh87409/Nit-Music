@@ -11,20 +11,27 @@ class SongArtworkWidget extends StatelessWidget {
     super.key,
     required this.size,
     required this.metadata,
+    this.width,
+    this.height,
     this.borderRadius = 10.0,
     this.errorWidgetIconSize = 20.0,
   });
   final double size;
+  final double? width;
+  final double? height;
   final MediaItem metadata;
   final double borderRadius;
   final double errorWidgetIconSize;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveWidth = width ?? size;
+    final effectiveHeight = height ?? size;
+
     return metadata.artUri?.scheme == 'file'
         ? SizedBox(
-            width: size,
-            height: size,
+            width: effectiveWidth,
+            height: effectiveHeight,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(borderRadius),
               child: Image.file(
@@ -34,11 +41,11 @@ class SongArtworkWidget extends StatelessWidget {
             ),
           )
         : CachedNetworkImage(
-            width: size,
-            height: size,
+            width: effectiveWidth,
+            height: effectiveHeight,
             imageUrl: metadata.artUri.toString(),
-            memCacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
-            memCacheHeight: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+            memCacheWidth: (effectiveWidth * MediaQuery.devicePixelRatioOf(context)).round(),
+            memCacheHeight: (effectiveHeight * MediaQuery.devicePixelRatioOf(context)).round(),
             imageBuilder: (context, imageProvider) => ClipRRect(
               borderRadius: BorderRadius.circular(borderRadius),
               child: Image(image: imageProvider, fit: BoxFit.cover),

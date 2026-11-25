@@ -5,9 +5,9 @@ class MarqueeWidget extends StatefulWidget {
     super.key,
     required this.child,
     this.direction = Axis.horizontal,
-    this.animationDuration = const Duration(milliseconds: 6000),
-    this.backDuration = const Duration(milliseconds: 800),
-    this.pauseDuration = const Duration(milliseconds: 800),
+    this.animationDuration = const Duration(seconds: 9),
+    this.backDuration = const Duration(seconds: 6),
+    this.pauseDuration = const Duration(milliseconds: 1500),
     this.manualScrollEnabled = true,
   });
 
@@ -65,19 +65,28 @@ class _MarqueeWidgetState extends State<MarqueeWidget>
 
     while (_scrollController.hasClients && !_isDisposed) {
       try {
-        // Check if content actually needs scrolling
-        if (_scrollController.position.maxScrollExtent <= 0) {
+        final extent = _scrollController.position.maxScrollExtent;
+        if (extent <= 0) {
           await Future.delayed(const Duration(seconds: 1));
           continue;
         }
+
+        final forwardMs = ((extent / 26.0) * 1000).round().clamp(
+          widget.animationDuration.inMilliseconds,
+          20000,
+        );
+        final backMs = ((extent / 35.0) * 1000).round().clamp(
+          widget.backDuration.inMilliseconds,
+          14000,
+        );
 
         await Future.delayed(widget.pauseDuration);
         if (_isDisposed || !_scrollController.hasClients) break;
 
         await _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: widget.animationDuration,
-          curve: Curves.linear,
+          duration: Duration(milliseconds: forwardMs),
+          curve: Curves.easeInOut,
         );
 
         await Future.delayed(widget.pauseDuration);
@@ -85,8 +94,8 @@ class _MarqueeWidgetState extends State<MarqueeWidget>
 
         await _scrollController.animateTo(
           0,
-          duration: widget.backDuration,
-          curve: Curves.easeOut,
+          duration: Duration(milliseconds: backMs),
+          curve: Curves.easeInOut,
         );
       } catch (e) {
         // Handle animation interruptions gracefully

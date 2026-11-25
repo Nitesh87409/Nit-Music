@@ -2,6 +2,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/main.dart' show logger;
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/playlist_image_picker.dart';
@@ -26,12 +27,24 @@ void showCreatePlaylistDialog(
           final colorScheme = Theme.of(context).colorScheme;
 
           Future<void> _pickImage() async {
-            final result = await pickImage();
-            if (result != null) {
-              dialogSetState(() {
-                imageBase64 = result;
-                imageUrl = null;
-              });
+            try {
+              final result = await pickImage();
+              if (!context.mounted) return;
+              if (result != null) {
+                dialogSetState(() {
+                  imageBase64 = result;
+                  imageUrl = null;
+                });
+              }
+            } catch (e, stackTrace) {
+              logger.log(
+                'Error picking playlist image in create dialog',
+                error: e,
+                stackTrace: stackTrace,
+              );
+              if (context.mounted) {
+                showToast(context, context.l10n!.error);
+              }
             }
           }
 
@@ -271,45 +284,57 @@ void showCreatePlaylistDialog(
               ),
               FilledButton.icon(
                 onPressed: () async {
-                  if (isYouTubeMode && id.isNotEmpty) {
-                    final result = await addUserPlaylist(id, context);
-                    if (context.mounted) showToast(context, result);
-                    if (!context.mounted) return;
-                    Navigator.pop(context);
-                  } else if (!isYouTubeMode && customPlaylistName.isNotEmpty) {
-                    final (result, newPlaylistId) = createCustomPlaylist(
-                      customPlaylistName.trim(),
-                      imageBase64 ?? imageUrl,
-                      context,
-                    );
-                    if (songToAdd != null) {
-                      if (context.mounted) {
-                        final addResult = addSongInCustomPlaylist(
-                          context,
-                          newPlaylistId,
-                          songToAdd,
-                        );
-                        showToast(context, addResult);
-                      }
-                    } else if (songsToAdd != null && songsToAdd.isNotEmpty) {
-                      if (context.mounted) {
-                        final addResult = addSongsInCustomPlaylist(
-                          context,
-                          newPlaylistId,
-                          songsToAdd,
-                        );
-                        showToast(context, addResult);
-                      }
-                    } else {
+                  try {
+                    if (isYouTubeMode && id.isNotEmpty) {
+                      final result = await addUserPlaylist(id, context);
                       if (context.mounted) showToast(context, result);
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                    } else if (!isYouTubeMode &&
+                        customPlaylistName.isNotEmpty) {
+                      final (result, newPlaylistId) = createCustomPlaylist(
+                        customPlaylistName.trim(),
+                        imageBase64 ?? imageUrl,
+                        context,
+                      );
+                      if (songToAdd != null) {
+                        if (context.mounted) {
+                          final addResult = addSongInCustomPlaylist(
+                            context,
+                            newPlaylistId,
+                            songToAdd,
+                          );
+                          showToast(context, addResult);
+                        }
+                      } else if (songsToAdd != null && songsToAdd.isNotEmpty) {
+                        if (context.mounted) {
+                          final addResult = addSongsInCustomPlaylist(
+                            context,
+                            newPlaylistId,
+                            songsToAdd,
+                          );
+                          showToast(context, addResult);
+                        }
+                      } else {
+                        if (context.mounted) showToast(context, result);
+                      }
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                    } else {
+                      showToast(
+                        context,
+                        '${context.l10n!.provideIdOrNameError}.',
+                      );
                     }
-                    if (!context.mounted) return;
-                    Navigator.pop(context);
-                  } else {
-                    showToast(
-                      context,
-                      '${context.l10n!.provideIdOrNameError}.',
+                  } catch (e, stackTrace) {
+                    logger.log(
+                      'Error creating or updating playlist',
+                      error: e,
+                      stackTrace: stackTrace,
                     );
+                    if (context.mounted) {
+                      showToast(context, context.l10n!.error);
+                    }
                   }
                 },
                 icon: const Icon(FluentIcons.add_20_filled),

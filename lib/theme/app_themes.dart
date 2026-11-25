@@ -53,8 +53,11 @@ ColorScheme getAppColorScheme(
   if (useSystemColor.value && selectedScheme != null) {
     return selectedScheme;
   } else {
+    final seed = primaryColorSetting.toARGB32() == 0xff91cef4
+        ? const Color(0xFFE11D48)
+        : primaryColorSetting;
     return ColorScheme.fromSeed(
-      seedColor: primaryColorSetting,
+      seedColor: seed,
       brightness: brightness,
     ).harmonized();
   }
@@ -68,11 +71,11 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
   final isLight = colorScheme.brightness == Brightness.light;
 
 
-  // Dark Purple theme colors
+  // Dark Crimson theme colors
   const darkBgColorValue = Color(0xFF09090E);
-  const darkCardColorValue = Color(0xFF1E1E2A);
-  const darkContainerHighValue = Color(0xFF2A2A35);
-  const primaryColorValue = Color(0xFF8B5CF6);
+  const darkCardColorValue = Color(0xFF161618);
+  const darkContainerHighValue = Color(0xFF222226);
+  const primaryColorValue = Color(0xFFE11D48);
 
   final bgColor = isLight ? colorScheme.surface : darkBgColorValue;
   final cardBgColor = isLight ? colorScheme.surfaceContainerLow : darkCardColorValue;
@@ -85,8 +88,8 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
     : ColorScheme.dark(
         primary: primaryColorValue,
         onPrimary: Colors.white,
-        secondary: const Color(0xFF00E5FF),
-        onSecondary: Colors.black,
+        secondary: primaryColorValue,
+        onSecondary: Colors.white,
         surface: darkBgColorValue,
         surfaceContainerLowest: darkBgColorValue,
         surfaceContainerLow: darkCardColorValue,
@@ -106,7 +109,7 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
     ),
     appBarTheme: base.appBarTheme.copyWith(
       backgroundColor: bgColor,
-      foregroundColor: effectiveColorScheme.primary,
+      foregroundColor: effectiveColorScheme.onSurface,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: true,
@@ -114,16 +117,16 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
         fontSize: 30,
         fontFamily: 'paytoneOne',
         fontWeight: FontWeight.w500,
-        color: effectiveColorScheme.primary,
+        color: effectiveColorScheme.onSurface,
         letterSpacing: -0.5,
       ),
       toolbarHeight: 64,
       iconTheme: IconThemeData(
-        color: effectiveColorScheme.onSurfaceVariant,
+        color: effectiveColorScheme.onSurface,
         size: 24,
       ),
       actionsIconTheme: IconThemeData(
-        color: effectiveColorScheme.onSurfaceVariant,
+        color: effectiveColorScheme.onSurface,
         size: 24,
       ),
     ),
@@ -220,15 +223,15 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       thickness: 1,
     ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: effectiveColorScheme.secondaryContainer,
-      contentTextStyle: TextStyle(
-        color: effectiveColorScheme.onSecondaryContainer,
+      backgroundColor: const Color(0xFFE11D48),
+      contentTextStyle: const TextStyle(
+        color: Colors.white,
         fontWeight: FontWeight.w500,
       ),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 6,
-      actionTextColor: effectiveColorScheme.secondary,
+      actionTextColor: Colors.white,
     ),
     visualDensity: VisualDensity.adaptivePlatformDensity,
     useMaterial3: true,
